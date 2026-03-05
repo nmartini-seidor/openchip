@@ -1,0 +1,10 @@
+.git
+.gitignore
+node_modules
+**/node_modules
+.next
+**/.next
+.turbo
+coverage
+playwright-report
+output/playwright

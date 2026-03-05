@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "last_updated": "2026-03-05T19:58:00Z",
+  "features": [
+    {
+      "id": "F-001",
+      "title": "Monorepo bootstrap with Next.js + Tailwind",
+      "status": "completed",
+      "dependencies": [],
+      "acceptance_criteria": [
+        "Workspace has apps/* and packages/*",
+        "Root scripts support dev/build/test/typecheck",
+        "App uses Next.js App Router and Tailwind"
+      ],
+      "verification_steps": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "notes": "Implemented with Turborepo and strict TypeScript settings."
+    },
+    {
+      "id": "F-002",
+      "title": "Typed domain packages and workflow engine",
+      "status": "completed",
+      "dependencies": ["F-001"],
+      "acceptance_criteria": [
+        "Shared types cover statuses/categories/docs/validation",
+        "Requirement resolver and state machine implemented",
+        "Compliance evaluator implemented"
+      ],
+      "verification_steps": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "notes": "No `any` usage introduced."
+    },
+    {
+      "id": "F-003",
+      "title": "Onboarding UI flows with server actions",
+      "status": "completed",
+      "dependencies": ["F-001", "F-002"],
+      "acceptance_criteria": [
+        "Dashboard, case creation, case detail, supplier portal pages work",
+        "Status transitions and validation actions are functional",
+        "Mock SAP and DocuWare integrations wired"
+      ],
+      "verification_steps": [
+        "pnpm typecheck",
+        "pnpm test:e2e"
+      ],
+      "notes": "Server Actions used for mutations per Next.js best practices."
+    },
+    {
+      "id": "F-004",
+      "title": "API contract routes",
+      "status": "completed",
+      "dependencies": ["F-002", "F-003"],
+      "acceptance_criteria": [
+        "Core onboarding/supplier/session routes available",
+        "Mock SAP and DocuWare adapter routes available"
+      ],
+      "verification_steps": [
+        "pnpm typecheck",
+        "pnpm test"
+      ],
+      "notes": "Route handlers implemented in app/api with schema validation."
+    },
+    {
+      "id": "F-005",
+      "title": "Validation, E2E testing and Docker Compose runtime",
+      "status": "completed",
+      "dependencies": ["F-001", "F-003", "F-004"],
+      "acceptance_criteria": [
+        "Automated Playwright e2e suite passes with recorded videos/screenshots",
+        "Mailpit-based email path is wired and testable",
+        "Docker Compose services build and run successfully"
+      ],
+      "verification_steps": [
+        "pnpm test:e2e",
+        "docker compose config",
+        "docker compose up -d --build",
+        "docker compose ps"
+      ],
+      "notes": "Validated with green Playwright run (9/9), artifact generation, and running web+postgres+mailpit containers."
+    }
+  ]
+}

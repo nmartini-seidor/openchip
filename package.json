@@ -1,0 +1,23 @@
+{
+  "name": "openchip-onboarding-monorepo",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "dev": "turbo dev --parallel",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "turbo test",
+    "test:e2e": "pnpm --filter @openchip/web test:e2e",
+    "test:e2e:demo": "pnpm --filter @openchip/web test:e2e:demo",
+    "db:seed": "pnpm --filter @openchip/db seed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^22.13.5",
+    "turbo": "^2.5.6",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.5"
+  }
+}

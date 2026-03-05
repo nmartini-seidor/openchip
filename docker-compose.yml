@@ -1,0 +1,41 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: openchip-web
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://openchip:openchip@postgres:5432/openchip
+      APP_BASE_URL: http://localhost:3000
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_FROM: onboarding@openchip.local
+      MAILPIT_API_BASE_URL: http://mailpit:8025
+    depends_on:
+      - postgres
+      - mailpit
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: openchip-postgres
+    environment:
+      POSTGRES_DB: openchip
+      POSTGRES_USER: openchip
+      POSTGRES_PASSWORD: openchip
+    ports:
+      - "5432:5432"
+    volumes:
+      - openchip_postgres_data:/var/lib/postgresql/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: openchip-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  openchip_postgres_data:
