@@ -4,8 +4,21 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: openchip-web
+    working_dir: /app
+    command: >
+      sh -c "pnpm install --frozen-lockfile --force --config.confirmModulesPurge=false &&
+      pnpm --filter @openchip/web dev --hostname 0.0.0.0 --port 3000"
     ports:
       - "3000:3000"
+    volumes:
+      - .:/app
+      - openchip_node_modules:/app/node_modules
+      - openchip_web_node_modules:/app/apps/web/node_modules
+      - openchip_db_node_modules:/app/packages/db/node_modules
+      - openchip_integrations_node_modules:/app/packages/integrations/node_modules
+      - openchip_shared_node_modules:/app/packages/shared/node_modules
+      - openchip_workflow_node_modules:/app/packages/workflow/node_modules
+      - openchip_next_cache:/app/apps/web/.next
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://openchip:openchip@postgres:5432/openchip
@@ -14,6 +27,10 @@ services:
       SMTP_PORT: "1025"
       SMTP_FROM: onboarding@openchip.local
       MAILPIT_API_BASE_URL: http://mailpit:8025
+      SAP_INTEGRATION_API_KEY: local-sap-integration-key
+      CI: "true"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
     depends_on:
       - postgres
       - mailpit
@@ -39,3 +56,10 @@ services:
 
 volumes:
   openchip_postgres_data:
+  openchip_node_modules:
+  openchip_web_node_modules:
+  openchip_db_node_modules:
+  openchip_integrations_node_modules:
+  openchip_shared_node_modules:
+  openchip_workflow_node_modules:
+  openchip_next_cache:

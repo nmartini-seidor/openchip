@@ -1,20 +1,35 @@
 import {
+  ActionHistoryEntry,
+  CaseActionType,
+  CaseSourceChannel,
   CaseStatus,
   CreateCaseInput,
   DocumentCode,
+  FundingType,
   DocumentSubmission,
   IntegrationEvent,
   InternalUser,
+  RequirementLevel,
+  RequirementMatrixEntry,
+  RequirementMatrixUpdateInput,
+  RequirementPreviewRow,
+  SupplierCategoryCreateInput,
+  SupplierCategoryDefinition,
+  SupplierCategoryStatusInput,
   OnboardingCase,
   PortalSettings,
   SupplierCategoryCode,
   SupplierSession,
   SupplierSubmissionInput,
+  SupplierTypeCreateInput,
+  SupplierTypeDefinition,
+  SupplierTypeStatusInput,
   UserUpsertInput,
   ValidateDocumentInput
 } from "@openchip/shared";
-import { evaluateCompliance, resolveRequirementsForCategory, transitionCaseStatus } from "@openchip/workflow";
+import { evaluateCompliance, transitionCaseStatus } from "@openchip/workflow";
 import { randomUUID } from "node:crypto";
+import { getSupplierConfigStore, SupplierConfigStore } from "./supplier-config-store";
 
 const INVITATION_TTL_DAYS = 14;
 const DEFAULT_INVITATION_OPEN_HOURS = 48;
@@ -41,6 +56,7 @@ function cloneCase(onboardingCase: OnboardingCase): OnboardingCase {
     ...onboardingCase,
     slaSnapshot: { ...onboardingCase.slaSnapshot },
     statusHistory: onboardingCase.statusHistory.map((entry) => ({ ...entry })),
+    actionHistory: (onboardingCase.actionHistory ?? []).map((entry) => ({ ...entry })),
     documents: onboardingCase.documents.map((document) => ({ ...document }))
   };
 }
@@ -60,6 +76,21 @@ function createDocumentSubmission(code: DocumentCode, requirementLevel: "mandato
     status: "pending_validation",
     version: 1,
     uploadedAt: nowIso(),
+    approver: null,
+    validationDate: null,
+    validFrom: null,
+    validTo: null,
+    comments: null
+  };
+}
+
+function toRequirementSummarySubmission(row: RequirementPreviewRow): DocumentSubmission {
+  return {
+    code: row.code,
+    requirementLevel: row.requirementLevel,
+    status: "pending_reception",
+    version: 1,
+    uploadedAt: null,
     approver: null,
     validationDate: null,
     validFrom: null,
@@ -147,6 +178,15 @@ function createDefaultUsers(): InternalUser[] {
   ];
 }
 
+interface CreateCaseOptions {
+  sourceChannel?: CaseSourceChannel | undefined;
+  sourceSystem?: string | null | undefined;
+  sourceReference?: string | null | undefined;
+  requestedBySapUser?: string | null | undefined;
+  sourceRequestedAt?: string | null | undefined;
+  integrationPayload?: Record<string, string> | undefined;
+}
+
 interface Store {
   cases: Map<string, OnboardingCase>;
   integrationEvents: IntegrationEvent[];
@@ -157,7 +197,12 @@ interface Store {
 export interface OnboardingRepository {
   listCases(): Promise<OnboardingCase[]>;
   getCase(caseId: string): Promise<OnboardingCase | null>;
-  createCase(input: CreateCaseInput, actor?: string): Promise<OnboardingCase>;
+  getCaseBySourceReference(
+    sourceChannel: CaseSourceChannel,
+    sourceSystem: string,
+    sourceReference: string
+  ): Promise<OnboardingCase | null>;
+  createCase(input: CreateCaseInput, actor?: string, options?: CreateCaseOptions): Promise<OnboardingCase>;
   sendInvitation(caseId: string, actor: string): Promise<OnboardingCase>;
   getCaseByInvitationToken(token: string): Promise<OnboardingCase | null>;
   getSupplierSession(token: string): Promise<SupplierSession | null>;
@@ -179,6 +224,17 @@ export interface OnboardingRepository {
   getUserByEmail(email: string): Promise<InternalUser | null>;
   upsertUser(input: UserUpsertInput, actor: string): Promise<InternalUser>;
   getPortalSettings(): Promise<PortalSettings>;
+  listSupplierTypes(includeInactive?: boolean): Promise<SupplierTypeDefinition[]>;
+  createSupplierType(input: SupplierTypeCreateInput, actor: string): Promise<SupplierTypeDefinition>;
+  setSupplierTypeStatus(input: SupplierTypeStatusInput, actor: string): Promise<SupplierTypeDefinition>;
+  listSupplierCategories(includeInactive?: boolean): Promise<SupplierCategoryDefinition[]>;
+  getSupplierCategory(categoryCode: SupplierCategoryCode): Promise<SupplierCategoryDefinition | null>;
+  createSupplierCategory(input: SupplierCategoryCreateInput, actor: string): Promise<SupplierCategoryDefinition>;
+  setSupplierCategoryStatus(input: SupplierCategoryStatusInput, actor: string): Promise<SupplierCategoryDefinition>;
+  listRequirementMatrixEntries(categoryCode: SupplierCategoryCode): Promise<RequirementMatrixEntry[]>;
+  updateRequirementMatrixEntry(input: RequirementMatrixUpdateInput, actor: string): Promise<RequirementMatrixEntry>;
+  getRequirementPreview(categoryCode: SupplierCategoryCode): Promise<RequirementPreviewRow[]>;
+  listRequirementPreviewsForActiveCategories(): Promise<Record<string, RequirementPreviewRow[]>>;
   updatePortalSettings(
     input: Pick<PortalSettings, "invitationOpenHours" | "onboardingCompletionDays">,
     actor: string
@@ -190,10 +246,14 @@ export interface OnboardingRepository {
     runId: string | null,
     mode: "workflow" | "fallback"
   ): Promise<OnboardingCase>;
+  recordCaseAction(caseId: string, actor: string, actionType: CaseActionType, note: string): Promise<OnboardingCase>;
 }
 
 class InMemoryOnboardingRepository implements OnboardingRepository {
-  constructor(private readonly store: Store) {}
+  constructor(
+    private readonly store: Store,
+    private readonly supplierConfigStore: SupplierConfigStore
+  ) {}
 
   private pushHistory(onboardingCase: OnboardingCase, status: CaseStatus, actor: string, note: string): void {
     onboardingCase.status = status;
@@ -229,13 +289,33 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     return onboardingCase === undefined ? null : cloneCase(onboardingCase);
   }
 
-  async createCase(input: CreateCaseInput, actor = "system"): Promise<OnboardingCase> {
+  async getCaseBySourceReference(
+    sourceChannel: CaseSourceChannel,
+    sourceSystem: string,
+    sourceReference: string
+  ): Promise<OnboardingCase | null> {
+    const onboardingCase = [...this.store.cases.values()].find(
+      (candidate) =>
+        candidate.sourceChannel === sourceChannel &&
+        candidate.sourceSystem === sourceSystem &&
+        candidate.sourceReference === sourceReference
+    );
+
+    return onboardingCase === undefined ? null : cloneCase(onboardingCase);
+  }
+
+  async createCase(input: CreateCaseInput, actor = "system", options: CreateCaseOptions = {}): Promise<OnboardingCase> {
     const existingCase = [...this.store.cases.values()].find(
       (candidate) => candidate.supplierVat.toLowerCase() === input.supplierVat.toLowerCase() && candidate.status !== "cancelled"
     );
 
     if (existingCase !== undefined) {
       throw new Error("A supplier with the same VAT already exists in onboarding.");
+    }
+
+    const category = await this.supplierConfigStore.getSupplierCategory(input.categoryCode);
+    if (category === null || !category.active) {
+      throw new Error("Selected supplier category is invalid or inactive.");
     }
 
     const id = randomUUID();
@@ -250,6 +330,11 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       supplierContactEmail: input.supplierContactEmail,
       requester: input.requester,
       createdBy: actor,
+      sourceChannel: options.sourceChannel ?? "manual",
+      sourceSystem: options.sourceSystem ?? null,
+      sourceReference: options.sourceReference ?? null,
+      requestedBySapUser: options.requestedBySapUser ?? null,
+      sourceRequestedAt: options.sourceRequestedAt ?? null,
       categoryCode: input.categoryCode,
       status: "onboarding_initiated",
       invitationToken: null,
@@ -274,13 +359,25 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
           note: "Onboarding case created"
         }
       ],
+      actionHistory: [],
       documents: []
     };
 
     this.store.cases.set(onboardingCase.id, onboardingCase);
     this.pushEvent(onboardingCase, "case_created", actor, {
-      categoryCode: onboardingCase.categoryCode
+      categoryCode: onboardingCase.categoryCode,
+      sourceChannel: onboardingCase.sourceChannel
     });
+
+    if (onboardingCase.sourceChannel === "sap_pr") {
+      this.pushEvent(onboardingCase, "sap_pr_new_supplier_received", actor, {
+        sapPrId: onboardingCase.sourceReference ?? "unknown",
+        sapSystem: onboardingCase.sourceSystem ?? "unknown",
+        requesterSapUserId: onboardingCase.requestedBySapUser ?? "unknown",
+        requestedAt: onboardingCase.sourceRequestedAt ?? onboardingCase.createdAt,
+        ...options.integrationPayload
+      });
+    }
 
     return cloneCase(onboardingCase);
   }
@@ -388,14 +485,17 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     onboardingCase.supplierAddress = input.address;
     onboardingCase.supplierCountry = input.country;
 
-    const requirements = resolveRequirementsForCategory(onboardingCase.categoryCode);
-    onboardingCase.documents = requirements.map((row) => {
+    const requirements = await this.supplierConfigStore.listRequirementPreviewRows(onboardingCase.categoryCode);
+    const documents: DocumentSubmission[] = [];
+    for (const row of requirements) {
       if (!isApplicableRequirement(row.requirementLevel)) {
-        throw new Error(`Unexpected non-applicable requirement for ${row.documentCode}`);
+        continue;
       }
 
-      return createDocumentSubmission(row.documentCode, row.requirementLevel);
-    });
+      documents.push(createDocumentSubmission(row.code, row.requirementLevel));
+    }
+
+    onboardingCase.documents = documents;
 
     const nextStatus = transitionCaseStatus(onboardingCase.status, "submission_completed");
     this.pushHistory(onboardingCase, nextStatus, actor, "Supplier submission completed");
@@ -538,6 +638,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     }
 
     this.store.portalSettings = createDefaultPortalSettings();
+    await this.supplierConfigStore.resetToDefaults("test.agent");
   }
 
   async forceExpireInvitation(caseId: string): Promise<OnboardingCase> {
@@ -602,20 +703,10 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
   }
 
   async getRequirementSummary(categoryCode: SupplierCategoryCode): Promise<DocumentSubmission[]> {
-    return resolveRequirementsForCategory(categoryCode)
+    const rows = await this.supplierConfigStore.listRequirementPreviewRows(categoryCode);
+    return rows
       .filter((row) => row.requirementLevel !== "not_applicable")
-      .map((row) => ({
-        code: row.documentCode,
-        requirementLevel: row.requirementLevel,
-        status: "pending_reception",
-        version: 1,
-        uploadedAt: null,
-        approver: null,
-        validationDate: null,
-        validFrom: null,
-        validTo: null,
-        comments: null
-      }));
+      .map((row) => toRequirementSummarySubmission(row));
   }
 
   async listUsers(): Promise<InternalUser[]> {
@@ -729,6 +820,51 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     return clonePortalSettings(this.store.portalSettings);
   }
 
+  async listSupplierTypes(includeInactive = false): Promise<SupplierTypeDefinition[]> {
+    return this.supplierConfigStore.listSupplierTypes(includeInactive);
+  }
+
+  async createSupplierType(input: SupplierTypeCreateInput, actor: string): Promise<SupplierTypeDefinition> {
+    return this.supplierConfigStore.createSupplierType(input, actor);
+  }
+
+  async setSupplierTypeStatus(input: SupplierTypeStatusInput, actor: string): Promise<SupplierTypeDefinition> {
+    return this.supplierConfigStore.setSupplierTypeStatus(input, actor);
+  }
+
+  async listSupplierCategories(includeInactive = false): Promise<SupplierCategoryDefinition[]> {
+    return this.supplierConfigStore.listSupplierCategories(includeInactive);
+  }
+
+  async getSupplierCategory(categoryCode: SupplierCategoryCode): Promise<SupplierCategoryDefinition | null> {
+    return this.supplierConfigStore.getSupplierCategory(categoryCode);
+  }
+
+  async createSupplierCategory(input: SupplierCategoryCreateInput, actor: string): Promise<SupplierCategoryDefinition> {
+    return this.supplierConfigStore.createSupplierCategory(input, actor);
+  }
+
+  async setSupplierCategoryStatus(input: SupplierCategoryStatusInput, actor: string): Promise<SupplierCategoryDefinition> {
+    return this.supplierConfigStore.setSupplierCategoryStatus(input, actor);
+  }
+
+  async listRequirementMatrixEntries(categoryCode: SupplierCategoryCode): Promise<RequirementMatrixEntry[]> {
+    return this.supplierConfigStore.listRequirementMatrixEntries(categoryCode);
+  }
+
+  async updateRequirementMatrixEntry(input: RequirementMatrixUpdateInput, actor: string): Promise<RequirementMatrixEntry> {
+    return this.supplierConfigStore.updateRequirementMatrixEntry(input, actor);
+  }
+
+  async getRequirementPreview(categoryCode: SupplierCategoryCode): Promise<RequirementPreviewRow[]> {
+    return this.supplierConfigStore.listRequirementPreviewRows(categoryCode);
+  }
+
+  async listRequirementPreviewsForActiveCategories(): Promise<Record<string, RequirementPreviewRow[]>> {
+    const categories = await this.supplierConfigStore.listSupplierCategories(false);
+    return this.supplierConfigStore.listRequirementPreviewByCategoryCodes(categories.map((category) => category.code));
+  }
+
   async recordWorkflowTrigger(
     caseId: string,
     actor: string,
@@ -743,6 +879,24 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       mode,
       runId: runId ?? "fallback"
     });
+
+    return cloneCase(onboardingCase);
+  }
+
+  async recordCaseAction(caseId: string, actor: string, actionType: CaseActionType, note: string): Promise<OnboardingCase> {
+    const onboardingCase = assertCaseExists(this.store.cases.get(caseId), caseId);
+
+    if (onboardingCase.actionHistory === undefined) {
+      onboardingCase.actionHistory = [];
+    }
+    const changedAt = nowIso();
+    onboardingCase.actionHistory.push({
+      actionType,
+      changedAt,
+      actor,
+      note
+    });
+    onboardingCase.updatedAt = changedAt;
 
     return cloneCase(onboardingCase);
   }
@@ -775,7 +929,10 @@ export function getOnboardingRepository(): OnboardingRepository {
   }
 
   if (globalThis.__openchipRepository === undefined) {
-    globalThis.__openchipRepository = new InMemoryOnboardingRepository(globalThis.__openchipStore);
+    globalThis.__openchipRepository = new InMemoryOnboardingRepository(
+      globalThis.__openchipStore,
+      getSupplierConfigStore()
+    );
   }
 
   return globalThis.__openchipRepository;

@@ -15,7 +15,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      "PLAYWRIGHT_TEST=1 APP_BASE_URL=http://localhost:3005 pnpm dev --port 3005",
+      "PLAYWRIGHT_TEST=1 APP_BASE_URL=http://localhost:3005 SAP_INTEGRATION_API_KEY=test-sap-key pnpm dev --port 3005",
     url: "http://localhost:3005",
     reuseExistingServer: false,
     timeout: 120_000

@@ -86,6 +86,7 @@ Always run the smallest sufficient checks for changed scope:
 - unit tests for affected modules
 - typecheck/lint for affected packages
 - integration/e2e checks when workflow-critical paths change
+- rebuild and restart containers with `docker compose up -d --build --force-recreate` after every repository change
 
 Never mark a feature `completed` without recording which checks ran and whether they passed.
 

@@ -9,7 +9,12 @@ import {
   invitationTokenSchema,
   onboardingInitiatorRoles,
   portalSettingsSchema,
+  requirementMatrixUpdateSchema,
+  supplierCategoryCreateSchema,
+  supplierCategoryStatusSchema,
   userUpsertSchema,
+  supplierTypeCreateSchema,
+  supplierTypeStatusSchema,
   validateDocumentSchema,
   supplierSubmissionSchema,
   InternalRole
@@ -29,6 +34,11 @@ function readFormValue(formData: FormData, key: string): string {
   return value;
 }
 
+function readFormValueOrEmpty(formData: FormData, key: string): string {
+  const value = formData.get(key);
+  return typeof value === "string" ? value : "";
+}
+
 function hasRole(role: InternalRole, allowedRoles: readonly InternalRole[]): boolean {
   return allowedRoles.includes(role);
 }
@@ -40,18 +50,33 @@ function getAppBaseUrl(): string {
 export async function createCaseAction(formData: FormData): Promise<void> {
   const user = await requireSessionRole(onboardingInitiatorRoles);
 
-  const parsed = createCaseInputSchema.parse({
-    supplierName: readFormValue(formData, "supplierName"),
-    supplierVat: readFormValue(formData, "supplierVat"),
-    supplierContactName: readFormValue(formData, "supplierContactName"),
-    supplierContactEmail: readFormValue(formData, "supplierContactEmail"),
-    requester: readFormValue(formData, "requester"),
-    categoryCode: readFormValue(formData, "categoryCode")
+  const parsed = createCaseInputSchema.safeParse({
+    supplierName: readFormValueOrEmpty(formData, "supplierName"),
+    supplierVat: readFormValueOrEmpty(formData, "supplierVat"),
+    supplierContactName: readFormValueOrEmpty(formData, "supplierContactName"),
+    supplierContactEmail: readFormValueOrEmpty(formData, "supplierContactEmail"),
+    requester: user.displayName,
+    categoryCode: readFormValueOrEmpty(formData, "categoryCode")
   });
 
-  const onboardingCase = await onboardingRepository.createCase(parsed, actorFromSession(user));
+  if (!parsed.success) {
+    redirect("/cases/new?error=validation");
+  }
+
+  let onboardingCaseId: string;
+  try {
+    const onboardingCase = await onboardingRepository.createCase(parsed.data, actorFromSession(user));
+    onboardingCaseId = onboardingCase.id;
+  } catch (error) {
+    if (error instanceof Error && error.message.toLowerCase().includes("same vat")) {
+      redirect("/cases/new?error=duplicate-vat");
+    }
+
+    redirect("/cases/new?error=unknown");
+  }
+
   revalidatePath("/");
-  redirect(`/cases/${onboardingCase.id}`);
+  redirect(`/cases/${onboardingCaseId}`);
 }
 
 export async function sendInvitationAction(formData: FormData): Promise<void> {
@@ -81,6 +106,7 @@ export async function sendInvitationAction(formData: FormData): Promise<void> {
 
   revalidatePath(`/cases/${caseId}`);
   revalidatePath("/");
+  redirect(`/cases/${caseId}?toast=invitation_sent`);
 }
 
 export async function supplierSubmitAction(formData: FormData): Promise<void> {
@@ -216,8 +242,10 @@ export async function sendExpiryReminderAction(formData: FormData): Promise<void
   });
 
   await onboardingRepository.recordWorkflowTrigger(caseId, actorFromSession(user), "document_expiry", null, "fallback");
+  await onboardingRepository.recordCaseAction(caseId, actorFromSession(user), "expiration_reminder_sent", "Expiration reminder email sent");
 
   revalidatePath(`/cases/${caseId}`);
+  redirect(`/cases/${caseId}?toast=expiration_reminder_sent`);
 }
 
 export async function upsertUserAction(formData: FormData): Promise<void> {
@@ -237,6 +265,73 @@ export async function upsertUserAction(formData: FormData): Promise<void> {
 
   await onboardingRepository.upsertUser(parsed, actorFromSession(user));
   revalidatePath("/users");
+}
+
+export async function createSupplierTypeAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+
+  const parsed = supplierTypeCreateSchema.parse({
+    label: readFormValue(formData, "label")
+  });
+
+  await onboardingRepository.createSupplierType(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+}
+
+export async function setSupplierTypeStatusAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+  const activeValue = formData.get("active");
+
+  const parsed = supplierTypeStatusSchema.parse({
+    typeId: readFormValue(formData, "typeId"),
+    active: activeValue === "on" || activeValue === "true"
+  });
+
+  await onboardingRepository.setSupplierTypeStatus(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+}
+
+export async function createSupplierCategoryAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+
+  const parsed = supplierCategoryCreateSchema.parse({
+    funding: readFormValue(formData, "funding"),
+    typeId: readFormValue(formData, "typeId"),
+    location: readFormValue(formData, "location"),
+    label: readFormValue(formData, "label")
+  });
+
+  await onboardingRepository.createSupplierCategory(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
+}
+
+export async function setSupplierCategoryStatusAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+  const activeValue = formData.get("active");
+
+  const parsed = supplierCategoryStatusSchema.parse({
+    categoryCode: readFormValue(formData, "categoryCode"),
+    active: activeValue === "on" || activeValue === "true"
+  });
+
+  await onboardingRepository.setSupplierCategoryStatus(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
+}
+
+export async function updateRequirementMatrixAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+
+  const parsed = requirementMatrixUpdateSchema.parse({
+    categoryCode: readFormValue(formData, "categoryCode"),
+    documentCode: readFormValue(formData, "documentCode"),
+    requirementLevel: readFormValue(formData, "requirementLevel")
+  });
+
+  await onboardingRepository.updateRequirementMatrixEntry(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
 }
 
 export async function updatePortalSettingsAction(formData: FormData): Promise<void> {

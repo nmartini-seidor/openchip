@@ -1,24 +1,40 @@
 import clsx from "clsx";
-import { CaseStatus } from "@openchip/shared";
+import { getTranslations } from "next-intl/server";
+import { CaseStatus, StatusHistoryEntry } from "@openchip/shared";
+import { formatDateTime } from "@/lib/format";
 
 interface SwimlaneStep {
   status: Exclude<CaseStatus, "cancelled">;
-  lane: "Internal" | "Supplier" | "Validation" | "SAP";
-  label: string;
+  laneKey:
+    | "steps.onboarding_initiated.lane"
+    | "steps.invitation_sent.lane"
+    | "steps.portal_accessed.lane"
+    | "steps.response_in_progress.lane"
+    | "steps.submission_completed.lane"
+    | "steps.validation_completed_pending_supplier_creation.lane"
+    | "steps.supplier_created_in_sap.lane";
+  labelKey:
+    | "steps.onboarding_initiated.label"
+    | "steps.invitation_sent.label"
+    | "steps.portal_accessed.label"
+    | "steps.response_in_progress.label"
+    | "steps.submission_completed.label"
+    | "steps.validation_completed_pending_supplier_creation.label"
+    | "steps.supplier_created_in_sap.label";
 }
 
 const steps: readonly SwimlaneStep[] = [
-  { status: "onboarding_initiated", lane: "Internal", label: "Onboarding initiated" },
-  { status: "invitation_sent", lane: "Internal", label: "Invitation sent" },
-  { status: "portal_accessed", lane: "Supplier", label: "Portal accessed" },
-  { status: "response_in_progress", lane: "Supplier", label: "Response in progress" },
-  { status: "submission_completed", lane: "Supplier", label: "Submission completed" },
+  { status: "onboarding_initiated", laneKey: "steps.onboarding_initiated.lane", labelKey: "steps.onboarding_initiated.label" },
+  { status: "invitation_sent", laneKey: "steps.invitation_sent.lane", labelKey: "steps.invitation_sent.label" },
+  { status: "portal_accessed", laneKey: "steps.portal_accessed.lane", labelKey: "steps.portal_accessed.label" },
+  { status: "response_in_progress", laneKey: "steps.response_in_progress.lane", labelKey: "steps.response_in_progress.label" },
+  { status: "submission_completed", laneKey: "steps.submission_completed.lane", labelKey: "steps.submission_completed.label" },
   {
     status: "validation_completed_pending_supplier_creation",
-    lane: "Validation",
-    label: "Validation completed"
+    laneKey: "steps.validation_completed_pending_supplier_creation.lane",
+    labelKey: "steps.validation_completed_pending_supplier_creation.label"
   },
-  { status: "supplier_created_in_sap", lane: "SAP", label: "Supplier created in SAP" }
+  { status: "supplier_created_in_sap", laneKey: "steps.supplier_created_in_sap.lane", labelKey: "steps.supplier_created_in_sap.label" }
 ] as const;
 
 function getStatusIndex(status: CaseStatus): number {
@@ -29,43 +45,82 @@ function getStatusIndex(status: CaseStatus): number {
   return steps.findIndex((step) => step.status === status);
 }
 
-export function WorkflowSwimlane({ status }: { status: CaseStatus }) {
+function getStatusDate(statusHistory: readonly StatusHistoryEntry[], status: string): string | null {
+  const entry = statusHistory.find((e) => e.status === status);
+  return entry?.changedAt ?? null;
+}
+
+export async function WorkflowSwimlane({
+  status,
+  statusHistory = []
+}: {
+  status: CaseStatus;
+  statusHistory?: readonly StatusHistoryEntry[];
+}) {
+  const t = await getTranslations("WorkflowSwimlane");
   const activeIndex = getStatusIndex(status);
 
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Workflow</p>
-      <ol className="mt-3 grid gap-3 lg:grid-cols-7">
+      <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{t("title")}</p>
+      <ol className="mt-3 flex items-stretch gap-1">
         {steps.map((step, index) => {
-          const isCompleted = activeIndex >= index;
+          const isCompleted = activeIndex >= index && activeIndex !== -1;
           const isActive = activeIndex === index;
+          const isPending = !isCompleted && !isActive;
+          const date = getStatusDate(statusHistory, step.status);
 
           return (
-            <li
-              key={step.status}
-              className={clsx(
-                "relative rounded-lg border px-3 py-2",
-                isCompleted
-                  ? "border-[var(--border-strong)] bg-[var(--surface-subtle)]"
-                  : "border-[var(--border)] bg-[var(--surface-muted)]"
-              )}
-            >
-              <span
+            <li key={step.status} className="flex min-w-0 flex-1 items-center gap-1">
+                <div
                 className={clsx(
-                  "absolute -top-2 left-2 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]",
-                  isCompleted ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "bg-slate-200 text-slate-600"
-                )}
-              >
-                {step.lane}
-              </span>
-              <p className={clsx("mt-2 text-xs font-semibold", isActive ? "text-slate-900" : "text-slate-700")}>{step.label}</p>
+                  "flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border px-2 py-1.5",
+                    isActive && "border-blue-400 bg-blue-50 shadow-[0_0_0_2px_rgba(59,130,246,0.2)]",
+                    isCompleted && !isActive && "border-emerald-300 bg-emerald-50",
+                    isPending && "border-[var(--border)] bg-[var(--surface-muted)]"
+                  )}
+                >
+                  <p className={clsx("truncate text-xs font-semibold", isActive ? "text-blue-700" : "text-slate-700")} title={t(step.labelKey)}>{t(step.labelKey)}</p>
+                  <p className="mt-0.5 flex min-w-0 items-center gap-x-1 truncate text-[10px] text-slate-500">
+                    <span
+                      className={clsx(
+                        "shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.04em]",
+                        isActive && "bg-blue-600 text-white",
+                        isCompleted && !isActive && "bg-emerald-600 text-white",
+                        isPending && "bg-slate-200 text-slate-600"
+                      )}
+                    >
+                      {t(step.laneKey)}
+                    </span>
+                    {date !== null ? (
+                      <time dateTime={date} title={formatDateTime(date)}>{formatDateTime(date)}</time>
+                    ) : (
+                      <span className="text-slate-400">—</span>
+                    )}
+                  </p>
+                </div>
+              {index < steps.length - 1 ? (
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 20 20"
+                  className={clsx(
+                    "h-3 w-3 shrink-0",
+                    activeIndex > index ? "text-emerald-500" : activeIndex === index ? "text-blue-500" : "text-slate-400"
+                  )}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                >
+                  <path d="m6 4 7 6-7 6" />
+                </svg>
+              ) : null}
             </li>
           );
         })}
       </ol>
       {status === "cancelled" ? (
         <p className="mt-3 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-[var(--danger)]">
-          Case is cancelled.
+          {t("cancelled")}
         </p>
       ) : null}
     </div>

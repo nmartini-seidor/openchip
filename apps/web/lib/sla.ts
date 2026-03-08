@@ -6,6 +6,13 @@ export interface CountdownInfo {
   secondsRemaining: number | null;
 }
 
+export interface CountdownLabels {
+  notStarted: string;
+  completed: string;
+  remaining: (duration: string) => string;
+  overdue: (duration: string) => string;
+}
+
 function pluralize(value: number, unit: string): string {
   return `${value}${unit}`;
 }
@@ -27,11 +34,15 @@ function formatDuration(ms: number): string {
   return `${pluralize(minutes, "m")}`;
 }
 
-export function getCountdown(deadlineIso: string | null, completedAtIso: string | null): CountdownInfo {
+export function getCountdown(
+  deadlineIso: string | null,
+  completedAtIso: string | null,
+  labels: CountdownLabels
+): CountdownInfo {
   if (deadlineIso === null) {
     return {
       status: "not_started",
-      label: "Not started",
+      label: labels.notStarted,
       secondsRemaining: null
     };
   }
@@ -39,7 +50,7 @@ export function getCountdown(deadlineIso: string | null, completedAtIso: string 
   if (completedAtIso !== null) {
     return {
       status: "completed",
-      label: "Completed",
+      label: labels.completed,
       secondsRemaining: 0
     };
   }
@@ -50,7 +61,7 @@ export function getCountdown(deadlineIso: string | null, completedAtIso: string 
   if (Number.isNaN(deadlineMs)) {
     return {
       status: "not_started",
-      label: "Not started",
+      label: labels.notStarted,
       secondsRemaining: null
     };
   }
@@ -59,7 +70,7 @@ export function getCountdown(deadlineIso: string | null, completedAtIso: string 
   if (diffMs <= 0) {
     return {
       status: "overdue",
-      label: `Overdue ${formatDuration(Math.abs(diffMs))}`,
+      label: labels.overdue(formatDuration(Math.abs(diffMs))),
       secondsRemaining: Math.floor(diffMs / 1000)
     };
   }
@@ -67,7 +78,7 @@ export function getCountdown(deadlineIso: string | null, completedAtIso: string 
   const warningThresholdMs = 24 * 60 * 60 * 1000;
   return {
     status: diffMs <= warningThresholdMs ? "warning" : "on_track",
-    label: `${formatDuration(diffMs)} remaining`,
+    label: labels.remaining(formatDuration(diffMs)),
     secondsRemaining: Math.floor(diffMs / 1000)
   };
 }

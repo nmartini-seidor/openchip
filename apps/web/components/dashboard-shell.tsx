@@ -1,10 +1,11 @@
 "use client";
 
 import clsx from "clsx";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { InternalRole, SupportedLocale } from "@openchip/shared";
-import { getMessages } from "@/lib/i18n";
 
 interface ShellUser {
   id: string;
@@ -65,43 +66,9 @@ function SettingsIcon() {
   );
 }
 
-function getPageTitle(pathname: string, locale: SupportedLocale): string {
-  const dict = getMessages(locale);
-
-  if (pathname === "/") {
-    return dict.navOverview;
-  }
-
-  if (pathname === "/cases/new") {
-    return dict.navNewCase;
-  }
-
-  if (pathname === "/users") {
-    return dict.navUsers;
-  }
-
-  if (pathname === "/portal-settings") {
-    return dict.navPortalSettings;
-  }
-
-  if (pathname.startsWith("/cases/")) {
-    return locale === "es" ? "Caso" : "Case";
-  }
-
-  if (pathname.startsWith("/supplier/")) {
-    return locale === "es" ? "Portal de Proveedor" : "Supplier Portal";
-  }
-
-  if (pathname === "/login") {
-    return dict.loginTitle;
-  }
-
-  return dict.appSection;
-}
-
-function getInitials(user: ShellUser | null, locale: SupportedLocale): string {
+function getInitials(user: ShellUser | null, guestInitials: string): string {
   if (user === null) {
-    return locale === "es" ? "IN" : "GU";
+    return guestInitials;
   }
 
   const names = user.displayName.trim().split(/\s+/);
@@ -128,40 +95,70 @@ function canCreateCase(sessionUser: ShellUser | null): boolean {
   return ["finance", "purchasing", "requester", "admin"].includes(sessionUser.role);
 }
 
+function canAccessAdministration(sessionUser: ShellUser | null): boolean {
+  return sessionUser?.role === "admin";
+}
+
 export function DashboardShell({ children, locale, sessionUser }: DashboardShellProps) {
   const pathname = usePathname();
-  const dict = getMessages(locale);
-  const pageTitle = getPageTitle(pathname, locale);
+  const t = useTranslations("Shell");
+  const showInternalNavigation = hasInternalNavigation(pathname, sessionUser);
+  const showCreateCaseButton = canCreateCase(sessionUser) && !pathname.startsWith("/supplier/") && pathname !== "/login";
+  const showAdministrationNav = canAccessAdministration(sessionUser);
+  const showHeaderActions = showCreateCaseButton || sessionUser !== null;
+  const showHeader = pathname !== "/login";
 
-  const navItems: readonly NavItem[] = [
+  let pageTitle = t("appSection");
+  if (pathname === "/") {
+    pageTitle = t("nav.overview");
+  } else if (pathname === "/cases/new") {
+    pageTitle = t("nav.newCase");
+  } else if (pathname === "/users") {
+    pageTitle = t("nav.users");
+  } else if (pathname === "/portal-settings") {
+    pageTitle = t("nav.portalSettings");
+  } else if (pathname.startsWith("/cases/")) {
+    pageTitle = t("page.case");
+  } else if (pathname.startsWith("/supplier/")) {
+    pageTitle = t("page.supplierPortal");
+  } else if (pathname === "/login") {
+    pageTitle = t("loginTitle");
+  }
+
+  const navItems: NavItem[] = [
     {
       href: "/",
-      label: dict.navOverview,
+      label: t("nav.overview"),
       isActive: (value) => value === "/",
       icon: <OverviewIcon />
-    },
-    {
-      href: "/cases/new",
-      label: dict.navNewCase,
-      isActive: (value) => value === "/cases/new",
-      icon: <CaseIcon />
-    },
-    {
-      href: "/users",
-      label: dict.navUsers,
-      isActive: (value) => value === "/users",
-      icon: <UsersIcon />
-    },
-    {
-      href: "/portal-settings",
-      label: dict.navPortalSettings,
-      isActive: (value) => value === "/portal-settings",
-      icon: <SettingsIcon />
     }
   ];
 
-  const showInternalNavigation = hasInternalNavigation(pathname, sessionUser);
-  const showCreateCaseButton = canCreateCase(sessionUser) && !pathname.startsWith("/supplier/") && pathname !== "/login";
+  if (showCreateCaseButton) {
+    navItems.push({
+      href: "/cases/new",
+      label: t("nav.newCase"),
+      isActive: (value) => value === "/cases/new",
+      icon: <CaseIcon />
+    });
+  }
+
+  if (showAdministrationNav) {
+    navItems.push(
+      {
+        href: "/users",
+        label: t("nav.users"),
+        isActive: (value) => value === "/users",
+        icon: <UsersIcon />
+      },
+      {
+        href: "/portal-settings",
+        label: t("nav.portalSettings"),
+        isActive: (value) => value === "/portal-settings",
+        icon: <SettingsIcon />
+      }
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
@@ -169,8 +166,8 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
         {showInternalNavigation ? (
           <aside className="hidden border-r border-[var(--border)] bg-[var(--surface)] px-5 py-6 lg:block">
             <Link href="/" className="block rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-3 hover:bg-[var(--surface-subtle)]">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{dict.appName}</p>
-              <p className="mt-1 text-sm font-semibold text-slate-900">{dict.appSection}</p>
+              <Image src="/logo-openchip.svg" alt={t("appName")} width={168} height={52} className="h-9 w-auto" priority />
+              <p className="mt-2 text-sm font-semibold text-slate-900">{t("appSection")}</p>
             </Link>
 
             <nav className="mt-6 space-y-1" aria-label="Primary navigation">
@@ -197,108 +194,117 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
         ) : null}
 
         <div className="min-w-0">
-          <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)]/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur lg:px-8">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{dict.companyTool}</p>
-                <Link href="/" className="cursor-pointer text-lg font-semibold text-slate-900 hover:text-[var(--primary)]">
-                  {pageTitle}
-                </Link>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {showCreateCaseButton ? (
-                  <Link
-                    href="/cases/new"
-                    className="inline-flex cursor-pointer items-center rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
-                  >
-                    {dict.createCase}
+          {showHeader ? (
+            <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)]/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur lg:px-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Link href="/" className="cursor-pointer" aria-label={t("appName")}>
+                    <Image src="/logo-openchip.svg" alt={t("appName")} width={140} height={44} className="h-8 w-auto" priority />
                   </Link>
-                ) : null}
-
-                <div className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-1">
-                  <form method="post" action="/api/preferences/locale">
-                    <input type="hidden" name="locale" value="en" />
-                    <input type="hidden" name="returnTo" value={pathname} />
-                    <button
-                      type="submit"
-                      className={clsx(
-                        "rounded px-2 py-1 text-xs font-semibold",
-                        locale === "en" ? "bg-[var(--surface)] text-slate-900" : "text-slate-600 hover:bg-[var(--surface)]"
-                      )}
-                      aria-label="Switch language to English"
-                    >
-                      EN
-                    </button>
-                  </form>
-                  <form method="post" action="/api/preferences/locale">
-                    <input type="hidden" name="locale" value="es" />
-                    <input type="hidden" name="returnTo" value={pathname} />
-                    <button
-                      type="submit"
-                      className={clsx(
-                        "rounded px-2 py-1 text-xs font-semibold",
-                        locale === "es" ? "bg-[var(--surface)] text-slate-900" : "text-slate-600 hover:bg-[var(--surface)]"
-                      )}
-                      aria-label="Switch language to Spanish"
-                    >
-                      ES
-                    </button>
-                  </form>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">{t("companyTool")}</p>
+                    <Link href="/" className="cursor-pointer text-lg font-semibold text-slate-900 hover:text-[var(--primary)]">
+                      {pageTitle}
+                    </Link>
+                  </div>
                 </div>
 
-                <details className="relative">
-                  <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-slate-700 hover:bg-[var(--surface-muted)]">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-slate-800">
-                      {getInitials(sessionUser, locale)}
-                    </span>
-                    <span className="hidden sm:inline">{sessionUser?.displayName ?? dict.guest}</span>
-                  </summary>
-                  <div className="absolute right-0 z-10 mt-2 w-64 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
-                    <p className="text-sm font-semibold text-slate-900">{sessionUser?.displayName ?? dict.guest}</p>
-                    <p className="text-xs text-slate-600">{sessionUser?.email ?? "supplier.portal@openchip.local"}</p>
-                    {sessionUser !== null ? (
-                      <p className="mt-1 text-xs uppercase tracking-[0.1em] text-slate-500">{sessionUser.role}</p>
+                {showHeaderActions ? (
+                  <div className="flex items-center gap-2">
+                    {showCreateCaseButton ? (
+                      <Link
+                        href="/cases/new"
+                        className="inline-flex cursor-pointer items-center rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
+                      >
+                        {t("createCase")}
+                      </Link>
                     ) : null}
 
                     {sessionUser !== null ? (
-                      <form method="post" action="/api/auth/logout" className="mt-3">
-                        <button
-                          type="submit"
-                          className="inline-flex w-full cursor-pointer items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[var(--surface-muted)]"
-                        >
-                          {dict.logout}
-                        </button>
-                      </form>
+                      <>
+                        <div className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-1">
+                          <form method="post" action="/api/preferences/locale">
+                            <input type="hidden" name="locale" value="en" />
+                            <input type="hidden" name="returnTo" value={pathname} />
+                            <button
+                              type="submit"
+                              className={clsx(
+                                "rounded px-2 py-1 text-xs font-semibold",
+                                locale === "en" ? "bg-[var(--surface)] text-slate-900" : "text-slate-600 hover:bg-[var(--surface)]"
+                              )}
+                              aria-label={t("language.switchToEnglish")}
+                            >
+                              EN
+                            </button>
+                          </form>
+                          <form method="post" action="/api/preferences/locale">
+                            <input type="hidden" name="locale" value="es" />
+                            <input type="hidden" name="returnTo" value={pathname} />
+                            <button
+                              type="submit"
+                              className={clsx(
+                                "rounded px-2 py-1 text-xs font-semibold",
+                                locale === "es" ? "bg-[var(--surface)] text-slate-900" : "text-slate-600 hover:bg-[var(--surface)]"
+                              )}
+                              aria-label={t("language.switchToSpanish")}
+                            >
+                              ES
+                            </button>
+                          </form>
+                        </div>
+
+                        <details className="relative">
+                          <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-slate-700 hover:bg-[var(--surface-muted)]">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-semibold text-slate-800">
+                              {getInitials(sessionUser, t("guestInitials"))}
+                            </span>
+                            <span className="hidden sm:inline">{sessionUser.displayName}</span>
+                          </summary>
+                          <div className="absolute right-0 z-10 mt-2 w-64 rounded-md border border-[var(--border)] bg-[var(--surface)] p-3 shadow-lg">
+                            <p className="text-sm font-semibold text-slate-900">{sessionUser.displayName}</p>
+                            <p className="text-xs text-slate-600">{sessionUser.email}</p>
+                            <p className="mt-1 text-xs uppercase tracking-[0.1em] text-slate-500">{sessionUser.role}</p>
+
+                            <form method="post" action="/api/auth/logout" className="mt-3">
+                              <button
+                                type="submit"
+                                className="inline-flex w-full cursor-pointer items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-[var(--surface-muted)]"
+                              >
+                                {t("logout")}
+                              </button>
+                            </form>
+                          </div>
+                        </details>
+                      </>
                     ) : null}
                   </div>
-                </details>
+                ) : null}
               </div>
-            </div>
 
-            {showInternalNavigation ? (
-              <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Mobile navigation">
-                {navItems.map((item) => {
-                  const active = item.isActive(pathname);
-                  return (
-                    <Link
-                      key={`mobile-${item.label}`}
-                      href={item.href}
-                      className={clsx(
-                        "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold",
-                        active
-                          ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
-                          : "border-[var(--border)] bg-[var(--surface)] text-slate-600"
-                      )}
-                    >
-                      {item.icon}
-                      {item.label}
-                    </Link>
-                  );
-                })}
-              </nav>
-            ) : null}
-          </header>
+              {showInternalNavigation ? (
+                <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Mobile navigation">
+                  {navItems.map((item) => {
+                    const active = item.isActive(pathname);
+                    return (
+                      <Link
+                        key={`mobile-${item.label}`}
+                        href={item.href}
+                        className={clsx(
+                          "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold",
+                          active
+                            ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
+                            : "border-[var(--border)] bg-[var(--surface)] text-slate-600"
+                        )}
+                      >
+                        {item.icon}
+                        {item.label}
+                      </Link>
+                    );
+                  })}
+                </nav>
+              ) : null}
+            </header>
+          ) : null}
           <div className="w-full px-4 py-6 lg:px-8">{children}</div>
         </div>
       </div>

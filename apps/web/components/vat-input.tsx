@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 interface VatInputProps {
   label: string;
@@ -19,6 +20,7 @@ function looksLikeVat(value: string): boolean {
 }
 
 export function VatInput({ label, inputId, inputName }: VatInputProps) {
+  const t = useTranslations("VatInput");
   const [value, setValue] = useState("");
   const [validatedValue, setValidatedValue] = useState<string | null>(null);
 
@@ -26,9 +28,10 @@ export function VatInput({ label, inputId, inputName }: VatInputProps) {
   const isValidated = validatedValue !== null && validatedValue === value.trim().toUpperCase();
 
   return (
-    <div className="grid gap-2">
-      <label htmlFor={inputId} className="text-sm font-semibold text-slate-700">
+    <div className="grid gap-2 self-start">
+      <label htmlFor={inputId} className="min-h-[1.5rem] text-sm font-semibold text-slate-700">
         {label}
+        <span className="text-red-600" aria-hidden> *</span>
       </label>
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <input
@@ -45,22 +48,19 @@ export function VatInput({ label, inputId, inputName }: VatInputProps) {
               setValidatedValue(null);
             }
           }}
-          className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
+          className="h-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
         />
         <button
           type="button"
           disabled={!isValidPattern}
           onClick={() => setValidatedValue(value.trim().toUpperCase())}
-          className="inline-flex items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-muted)] disabled:opacity-50"
+          className="inline-flex h-10 items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-muted)] disabled:opacity-50"
         >
-          Validate VAT
+          {t("validate")}
         </button>
       </div>
-      <p
-        className={`text-xs ${isValidated ? "text-[var(--success)]" : "text-slate-500"}`}
-        aria-live="polite"
-      >
-        {isValidated ? "VAT format validated (mock)." : "Validate VAT is enabled when format looks valid."}
+      <p className={`min-h-[1rem] text-xs ${isValidated ? "text-[var(--success)]" : "text-slate-500"}`} aria-live="polite">
+        {isValidated ? t("success") : ""}
       </p>
     </div>
   );

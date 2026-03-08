@@ -5,7 +5,7 @@ export interface NewCaseInput {
   supplierVat: string;
   supplierContactName: string;
   supplierContactEmail: string;
-  requester: string;
+  requester?: string;
   categoryCode: string;
 }
 
@@ -33,8 +33,16 @@ export async function resetTestState(request: APIRequestContext): Promise<void> 
 }
 
 export async function loginAsFinance(page: Page): Promise<void> {
+  await loginAs(page, "finance@openchip.local");
+}
+
+export async function loginAsAdmin(page: Page): Promise<void> {
+  await loginAs(page, "admin@openchip.local");
+}
+
+export async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto("/login");
-  await page.getByLabel("Email").fill("finance@openchip.local");
+  await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL("/");
 }
@@ -56,7 +64,6 @@ export async function createCaseViaUi(page: Page, input: NewCaseInput): Promise<
   await page.getByRole("button", { name: "Validate VAT" }).click();
   await page.getByLabel("Supplier Contact Name").fill(input.supplierContactName);
   await page.getByLabel("Supplier Contact Email").fill(input.supplierContactEmail);
-  await page.getByLabel("Requester").fill(input.requester);
   await page.getByLabel("Supplier Category").selectOption(input.categoryCode);
   await page.getByRole("button", { name: "Create onboarding case" }).click();
 

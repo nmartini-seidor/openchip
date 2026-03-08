@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
 import { withWorkflow } from "workflow/next";
 
 const nextConfig: NextConfig = {
@@ -6,4 +7,6 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@openchip/shared", "@openchip/workflow", "@openchip/db", "@openchip/integrations"]
 };
 
-export default withWorkflow(nextConfig);
+const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
+
+export default withWorkflow(withNextIntl(nextConfig));

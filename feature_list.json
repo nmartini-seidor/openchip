@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_updated": "2026-03-05T19:58:00Z",
+  "last_updated": "2026-03-06T14:10:00Z",
   "features": [
     {
       "id": "F-001",
@@ -82,6 +82,28 @@
         "docker compose ps"
       ],
       "notes": "Validated with green Playwright run (9/9), artifact generation, and running web+postgres+mailpit containers."
+    },
+    {
+      "id": "F-006",
+      "title": "SAP PR inbound integration + OpenAPI/Swagger contract",
+      "status": "completed",
+      "dependencies": ["F-002", "F-004", "F-005"],
+      "acceptance_criteria": [
+        "Inbound SAP PR endpoint creates onboarding case with idempotency by SAP reference",
+        "Endpoint is protected by API key and validates payload schema",
+        "OpenAPI JSON and Swagger UI are exposed",
+        "Dashboard exposes SAP-originated queue visibility"
+      ],
+      "verification_steps": [
+        "pnpm typecheck",
+        "pnpm lint",
+        "pnpm test",
+        "pnpm --filter @openchip/web test:e2e",
+        "pnpm --filter @openchip/web build",
+        "docker compose up -d --build --force-recreate",
+        "docker compose ps"
+      ],
+      "notes": "Implemented `/api/integrations/sap/purchase-requests/new-supplier`, `/api/openapi.json`, `/api/docs`, source metadata in cases, and Playwright SAP integration coverage."
     }
   ]
 }

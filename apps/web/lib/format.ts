@@ -8,6 +8,14 @@ export function formatDateTime(value: string): string {
   });
 }
 
+export function formatDate(value: string): string {
+  return new Date(value).toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "short",
+    day: "2-digit"
+  });
+}
+
 export function toTitleCase(value: string): string {
   return value
     .split("_")

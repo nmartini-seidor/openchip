@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Openchip Web App
 
-## Getting Started
-
-First, run the development server:
+## Run
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm --filter @openchip/web dev --port 3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Required env vars:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `APP_BASE_URL` (default `http://localhost:3000`)
+- `SAP_INTEGRATION_API_KEY` (required for SAP inbound endpoint auth)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## SAP Inbound Integration
 
-## Learn More
+Endpoint:
 
-To learn more about Next.js, take a look at the following resources:
+- `POST /api/v1/integrations/cases`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Headers:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- `X-API-Key: <SAP_INTEGRATION_API_KEY>`
 
-## Deploy on Vercel
+Behavior:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Creates onboarding case from SAP Purchase Request with supplier = `New Supplier`.
+- Idempotent by `sapSystem + sapPrId`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## API Contract (Swagger/OpenAPI)
+
+- OpenAPI JSON: `GET /api/openapi.json`
+- Swagger UI: `GET /api/docs`
+
+## Credentials and Access
+
+### Services (Docker Compose)
+
+- Web: `http://localhost:3000`
+- Postgres: `localhost:5432`
+- Mailpit UI: `http://localhost:8025`
+- SMTP: `localhost:1025`
+
+### Internal App Login Users (seeded)
+
+The app uses mock login by email (no password).
+
+- `admin@openchip.local` (admin)
+- `finance@openchip.local` (finance)
+- `purchasing@openchip.local` (purchasing)
+- `requester@openchip.local` (requester)
+- `compliance@openchip.local` (compliance)
+
+### SAP Integration Auth
+
+- Header: `X-API-Key: local-sap-integration-key`
+- Env var: `SAP_INTEGRATION_API_KEY=local-sap-integration-key`
+- Endpoint: `POST /api/v1/integrations/cases`
+
+### Database Credentials
+
+- Host: `localhost`
+- Port: `5432`
+- Database: `openchip`
+- User: `openchip`
+- Password: `openchip`
+- URL: `postgresql://openchip:openchip@localhost:5432/openchip`
+
+### Mail / SMTP
+
+- SMTP Host: `localhost`
+- SMTP Port: `1025`
+- From: `onboarding@openchip.local`
+- Mailpit API base: `http://localhost:8025`

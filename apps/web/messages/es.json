@@ -1,0 +1,339 @@
+{
+  "Layout": {
+    "skipToMainContent": "Saltar al contenido principal"
+  },
+  "Shell": {
+    "appName": "Openchip",
+    "appSection": "Alta de Proveedores",
+    "companyTool": "Supplier Onboarding Portal",
+    "nav": {
+      "overview": "Resumen",
+      "newCase": "Nuevo Caso",
+      "users": "Usuarios",
+      "portalSettings": "Configuración del Portal"
+    },
+    "createCase": "Crear Caso",
+    "loginTitle": "Iniciar sesión",
+    "guestInitials": "IN",
+    "logout": "Cerrar sesión",
+    "page": {
+      "case": "Caso",
+      "supplierPortal": "Portal de Proveedor"
+    },
+    "language": {
+      "switchToEnglish": "Cambiar idioma a inglés",
+      "switchToSpanish": "Cambiar idioma a español"
+    }
+  },
+  "Login": {
+    "title": "Iniciar sesión",
+    "subtitle": "Usa tu cuenta de Openchip",
+    "email": "Correo",
+    "language": "Idioma",
+    "signIn": "Entrar",
+    "locale": {
+      "english": "Inglés",
+      "spanish": "Español"
+    },
+    "errors": {
+      "invalidEmail": "Introduce un correo válido.",
+      "userNotFound": "Usuario no encontrado o inactivo. Usa un correo inicial como finance@openchip.local."
+    }
+  },
+  "Common": {
+    "invitationSla": "Invitación",
+    "completionSla": "Finalización",
+    "labels": {
+      "case": "Caso",
+      "category": "Categoría"
+    },
+    "sourceChannel": {
+      "manual": "Manual",
+      "sapPr": "PR SAP"
+    },
+    "requirementLevel": {
+      "mandatory": "obligatorio",
+      "optional": "opcional",
+      "notApplicable": "N/A"
+    },
+    "documentStatus": {
+      "pendingReception": "pendiente de recepción",
+      "pendingValidation": "pendiente de validación",
+      "approved": "aprobado",
+      "rejected": "rechazado",
+      "approvedProvisionally": "aprobado provisionalmente"
+    }
+  },
+  "Sla": {
+    "notStarted": "No iniciado",
+    "completed": "Completado",
+    "remaining": "Restan {duration}",
+    "overdue": "Vencido hace {duration}"
+  },
+  "Home": {
+    "overview": {
+      "title": "Resumen operativo",
+      "subtitle": "Seguimiento de capacidad y cuellos de botella",
+      "totalCases": "Casos totales",
+      "pendingValidation": "Validación pendiente",
+      "createdInSap": "Creado en SAP"
+    },
+    "quickActions": {
+      "title": "Acciones rápidas",
+      "subtitle": "Comandos más usados",
+      "createCase": "Crear caso",
+      "helperText": "La revisión y validación se gestiona desde cada espacio de caso."
+    },
+    "cases": {
+      "title": "Casos de onboarding",
+      "subtitle": "Cola operativa",
+      "empty": "Todavía no hay casos. Crea un nuevo caso para empezar.",
+      "emptyFiltered": "No hay casos para el filtro de origen seleccionado.",
+      "filters": {
+        "all": "Todos",
+        "sapPr": "PR SAP",
+        "manual": "Manual"
+      },
+      "table": {
+        "supplier": "Proveedor",
+        "source": "Origen",
+        "status": "Estado",
+        "action": "Acción",
+        "openCase": "Abrir caso"
+      }
+    }
+  },
+  "NewCase": {
+    "goBack": "Volver",
+    "title": "Crear caso de onboarding",
+    "subtitle": "Formulario interno de inicio",
+    "supplierName": "Nombre del proveedor",
+    "supplierVat": "NIF/CIF / Tax ID del proveedor",
+    "supplierContactName": "Nombre de contacto del proveedor",
+    "supplierContactEmail": "Correo de contacto del proveedor",
+    "requester": "Solicitante",
+    "createCase": "Crear caso de onboarding",
+    "creatingCase": "Creando caso...",
+    "errors": {
+      "validation": "Revisa los campos obligatorios. El NIF/CIF o Tax ID debe tener al menos 3 caracteres.",
+      "duplicateVat": "Ya existe un caso de onboarding para este NIF/CIF o Tax ID.",
+      "unknown": "No se pudo crear el caso. Inténtalo de nuevo."
+    }
+  },
+  "VatInput": {
+    "validate": "Validar NIF/CIF",
+    "success": "Formato de NIF/CIF validado (mock)."
+  },
+  "CaseDetails": {
+    "controls": {
+      "title": "Controles del caso",
+      "subtitle": "Acciones disponibles para el estado actual",
+      "sendInvitation": "Enviar invitación",
+      "sendingInvitation": "Enviando invitación...",
+      "approveAllMandatory": "Aprobar todos los documentos obligatorios",
+      "approvingMandatory": "Aprobando documentos...",
+      "completeValidation": "Completar validación",
+      "completingValidation": "Completando validación...",
+      "createSupplierInSap": "Crear proveedor en SAP",
+      "creatingSupplierInSap": "Creando proveedor en SAP...",
+      "resubmitRejected": "Reenviar documentos rechazados",
+      "resubmittingRejected": "Reenviando documentos...",
+      "sendExpiryReminder": "Enviar recordatorio de expiración",
+      "sendingReminder": "Enviando recordatorio...",
+      "cancelCase": "Cancelar caso",
+      "cancellationReason": "Motivo de cancelación",
+      "defaultCancellationReason": "Cancelado por solicitante interno",
+      "cancellingCase": "Cancelando caso...",
+      "goBack": "Volver",
+      "openSupplierPortal": "Abrir portal del proveedor",
+      "copySupplierLink": "Enlace proveedor",
+      "copyMagicLink": "Copiar enlace mágico de proveedor",
+      "magicLinkCopied": "Copiado",
+      "invitationNotGenerated": "La invitación todavía no se ha generado."
+    },
+    "requirements": {
+      "title": "Requisitos documentales",
+      "subtitle": "Matriz de requisitos y decisiones de validación",
+      "requirement": "Requisito",
+      "status": "Estado",
+      "approver": "Aprobador",
+      "action": "Acción",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "approveProvisionally": "Aprobar provisionalmente",
+      "defaultComment": "Validado",
+      "apply": "Aplicar",
+      "applying": "Aplicando...",
+      "noAction": "Sin acción disponible"
+    },
+    "compliance": {
+      "title": "Estado de cumplimiento",
+      "poBlock": "Bloqueo de pedido",
+      "enabled": "Activado",
+      "disabled": "Desactivado",
+      "mandatoryPending": "Obligatorios pendientes",
+      "mandatoryExpired": "Obligatorios vencidos"
+    },
+    "timeline": {
+      "title": "Historial de estado"
+    },
+    "metadata": {
+      "title": "Metadatos del caso",
+      "requester": "Solicitante",
+      "supplierCategory": "Categoría de proveedor",
+      "source": "Origen",
+      "sourceReference": "Referencia origen",
+      "sourceSystem": "Sistema origen",
+      "requestedBySapUser": "Usuario solicitante SAP",
+      "createdBy": "Creado por",
+      "contact": "Contacto",
+      "created": "Creado"
+    }
+  },
+  "StatusBadge": {
+    "onboarding_initiated": "Onboarding Iniciado",
+    "invitation_sent": "Invitación Enviada",
+    "portal_accessed": "Portal Accedido",
+    "response_in_progress": "Respuesta En Progreso",
+    "submission_completed": "Envío Completado",
+    "validation_completed_pending_supplier_creation": "Validación Completada",
+    "supplier_created_in_sap": "Proveedor Creado En Sap",
+    "cancelled": "Cancelado"
+  },
+  "StatusTimeline": {
+    "actor": "Usuario",
+    "action": {
+      "expiration_reminder_sent": "Recordatorio de expiración enviado"
+    }
+  },
+  "WorkflowSwimlane": {
+    "title": "Flujo",
+    "cancelled": "El caso está cancelado.",
+    "steps": {
+      "onboarding_initiated": {
+        "lane": "Interno",
+        "label": "Onboarding iniciado"
+      },
+      "invitation_sent": {
+        "lane": "Interno",
+        "label": "Invitación enviada"
+      },
+      "portal_accessed": {
+        "lane": "Proveedor",
+        "label": "Portal accedido"
+      },
+      "response_in_progress": {
+        "lane": "Proveedor",
+        "label": "Respuesta en progreso"
+      },
+      "submission_completed": {
+        "lane": "Proveedor",
+        "label": "Envío completado"
+      },
+      "validation_completed_pending_supplier_creation": {
+        "lane": "Validación",
+        "label": "Validación completada"
+      },
+      "supplier_created_in_sap": {
+        "lane": "SAP",
+        "label": "Proveedor creado en SAP"
+      }
+    }
+  },
+  "PortalSettings": {
+    "title": "Configuración del portal",
+    "subtitle": "Ventanas de SLA para el onboarding de proveedores",
+    "invitationOpenHours": "Tiempo máximo para abrir la invitación de onboarding (horas)",
+    "onboardingCompletionDays": "Tiempo máximo para completar el onboarding (días)",
+    "saveSettings": "Guardar configuración del portal",
+    "savingSettings": "Guardando configuración...",
+    "supplierTypes": {
+      "title": "Tipos de proveedor",
+      "subtitle": "Gestiona los tipos de proveedor asignables",
+      "key": "Clave",
+      "status": "Estado",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "saving": "Guardando...",
+      "newTypeLabel": "Etiqueta del nuevo tipo de proveedor",
+      "newTypePlaceholder": "Ejemplo: Partner estratégico",
+      "addType": "Añadir tipo",
+      "addingType": "Añadiendo..."
+    },
+    "supplierCategories": {
+      "title": "Categorías de proveedor",
+      "subtitle": "Asigna combinaciones de financiación, tipo y ubicación",
+      "status": "Estado",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "deactivate": "Desactivar",
+      "activate": "Activar",
+      "saving": "Guardando...",
+      "funding": "Financiación",
+      "type": "Tipo",
+      "location": "Ubicación",
+      "displayLabel": "Etiqueta visible",
+      "displayLabelPlaceholder": "Ejemplo: No subvencionado / Partner estratégico / Nacional",
+      "addCategory": "Añadir categoría",
+      "addingCategory": "Añadiendo..."
+    },
+    "requirementMatrix": {
+      "title": "Matriz de requisitos",
+      "subtitle": "Edita requisitos documentales por categoría",
+      "empty": "Crea al menos una categoría para editar la matriz de requisitos.",
+      "category": "Categoría",
+      "loadCategory": "Cargar categoría",
+      "editing": "Editando",
+      "document": "Documento",
+      "level": "Nivel",
+      "action": "Acción",
+      "save": "Guardar",
+      "saving": "Guardando..."
+    },
+    "policy": {
+      "title": "Política actual",
+      "subtitle": "Configuración de cumplimiento vigente",
+      "invitationSla": "SLA apertura invitación",
+      "completionSla": "SLA finalización",
+      "lastUpdate": "Última actualización",
+      "hours": "horas",
+      "days": "días",
+      "by": "por"
+    }
+  },
+  "Users": {
+    "title": "Usuarios",
+    "subtitle": "Asignación de roles y estado de cuentas",
+    "displayName": "Nombre visible",
+    "role": "Rol",
+    "status": "Estado",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "save": "Guardar",
+    "saving": "Guardando...",
+    "addTitle": "Añadir usuario",
+    "addSubtitle": "Crea una nueva cuenta interna",
+    "email": "Correo",
+    "createUser": "Crear usuario",
+    "creatingUser": "Creando..."
+  },
+  "SupplierPortal": {
+    "title": "Portal de proveedor",
+    "subtitle": "Completa la información de onboarding",
+    "supplier": "Proveedor",
+    "submitted": "Respuesta enviada. El equipo interno continuará el proceso.",
+    "address": "Dirección",
+    "country": "País",
+    "submit": "Enviar respuesta",
+    "submitting": "Enviando...",
+    "requiredDocsTitle": "Documentación requerida",
+    "requiredDocsSubtitle": "Documentos solicitados por categoría"
+  },
+  "NotFound": {
+    "title": "Recurso no encontrado",
+    "description": "El caso de proveedor o enlace de invitación es inválido, ha vencido o ya no está disponible.",
+    "back": "Volver al panel"
+  }
+}

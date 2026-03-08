@@ -1,5 +1,6 @@
-import { CaseStatus } from "@openchip/shared";
 import clsx from "clsx";
+import { getTranslations } from "next-intl/server";
+import { CaseStatus } from "@openchip/shared";
 
 const toneByStatus: Record<CaseStatus, string> = {
   onboarding_initiated: "bg-slate-100 text-slate-700 border-slate-300",
@@ -12,14 +13,9 @@ const toneByStatus: Record<CaseStatus, string> = {
   cancelled: "bg-[#f8eeee] text-[var(--danger)] border-[#dec0c0]"
 };
 
-function normalizeLabel(value: CaseStatus): string {
-  return value
-    .split("_")
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
-}
+export async function StatusBadge({ status }: { status: CaseStatus }) {
+  const t = await getTranslations("StatusBadge");
 
-export function StatusBadge({ status }: { status: CaseStatus }) {
   return (
     <span
       className={clsx(
@@ -28,7 +24,7 @@ export function StatusBadge({ status }: { status: CaseStatus }) {
       )}
     >
       <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-current" aria-hidden />
-      {normalizeLabel(status)}
+      {t(status)}
     </span>
   );
 }

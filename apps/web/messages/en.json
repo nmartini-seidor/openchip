@@ -1,0 +1,339 @@
+{
+  "Layout": {
+    "skipToMainContent": "Skip to main content"
+  },
+  "Shell": {
+    "appName": "Openchip",
+    "appSection": "Supplier Onboarding",
+    "companyTool": "Supplier Onboarding Portal",
+    "nav": {
+      "overview": "Overview",
+      "newCase": "New Case",
+      "users": "Users",
+      "portalSettings": "Portal Settings"
+    },
+    "createCase": "Create Case",
+    "loginTitle": "Sign in",
+    "guestInitials": "GU",
+    "logout": "Log out",
+    "page": {
+      "case": "Case",
+      "supplierPortal": "Supplier Portal"
+    },
+    "language": {
+      "switchToEnglish": "Switch language to English",
+      "switchToSpanish": "Switch language to Spanish"
+    }
+  },
+  "Login": {
+    "title": "Sign in",
+    "subtitle": "Use your Openchip account",
+    "email": "Email",
+    "language": "Language",
+    "signIn": "Sign in",
+    "locale": {
+      "english": "English",
+      "spanish": "Spanish"
+    },
+    "errors": {
+      "invalidEmail": "Enter a valid email address.",
+      "userNotFound": "User not found or inactive. Use a seeded account such as finance@openchip.local."
+    }
+  },
+  "Common": {
+    "invitationSla": "Invitation",
+    "completionSla": "Completion",
+    "labels": {
+      "case": "Case",
+      "category": "Category"
+    },
+    "sourceChannel": {
+      "manual": "Manual",
+      "sapPr": "SAP PR"
+    },
+    "requirementLevel": {
+      "mandatory": "mandatory",
+      "optional": "optional",
+      "notApplicable": "N/A"
+    },
+    "documentStatus": {
+      "pendingReception": "pending reception",
+      "pendingValidation": "pending validation",
+      "approved": "approved",
+      "rejected": "rejected",
+      "approvedProvisionally": "approved provisionally"
+    }
+  },
+  "Sla": {
+    "notStarted": "Not started",
+    "completed": "Completed",
+    "remaining": "{duration} remaining",
+    "overdue": "Overdue {duration}"
+  },
+  "Home": {
+    "overview": {
+      "title": "Operations Overview",
+      "subtitle": "Track onboarding throughput and bottlenecks",
+      "totalCases": "Total cases",
+      "pendingValidation": "Pending validation",
+      "createdInSap": "Created in SAP"
+    },
+    "quickActions": {
+      "title": "Quick actions",
+      "subtitle": "Most-used commands",
+      "createCase": "Create case",
+      "helperText": "Case review and validation are available from each case workspace."
+    },
+    "cases": {
+      "title": "Onboarding cases",
+      "subtitle": "Operational queue",
+      "empty": "No cases yet. Create a new onboarding case to begin.",
+      "emptyFiltered": "No cases match the selected source filter.",
+      "filters": {
+        "all": "All",
+        "sapPr": "SAP PR",
+        "manual": "Manual"
+      },
+      "table": {
+        "supplier": "Supplier",
+        "source": "Source",
+        "status": "Status",
+        "action": "Action",
+        "openCase": "Open case"
+      }
+    }
+  },
+  "NewCase": {
+    "goBack": "Go Back",
+    "title": "Create onboarding case",
+    "subtitle": "Internal initiation form",
+    "supplierName": "Supplier Name",
+    "supplierVat": "Supplier VAT / Tax ID",
+    "supplierContactName": "Supplier Contact Name",
+    "supplierContactEmail": "Supplier Contact Email",
+    "requester": "Requester",
+    "createCase": "Create onboarding case",
+    "creatingCase": "Creating case...",
+    "errors": {
+      "validation": "Please review required fields. VAT / Tax ID must have at least 3 characters.",
+      "duplicateVat": "An onboarding case already exists for this VAT / Tax ID.",
+      "unknown": "The case could not be created. Please try again."
+    }
+  },
+  "VatInput": {
+    "validate": "Validate VAT",
+    "success": "VAT format validated (mock)."
+  },
+  "CaseDetails": {
+    "controls": {
+      "title": "Case controls",
+      "subtitle": "Actions available for current status",
+      "sendInvitation": "Send invitation",
+      "sendingInvitation": "Sending invitation...",
+      "approveAllMandatory": "Approve all mandatory documents",
+      "approvingMandatory": "Approving mandatory docs...",
+      "completeValidation": "Complete validation",
+      "completingValidation": "Completing validation...",
+      "createSupplierInSap": "Create supplier in SAP",
+      "creatingSupplierInSap": "Creating supplier in SAP...",
+      "resubmitRejected": "Resubmit rejected documents",
+      "resubmittingRejected": "Resubmitting documents...",
+      "sendExpiryReminder": "Send expiration reminder",
+      "sendingReminder": "Sending reminder...",
+      "cancelCase": "Cancel case",
+      "cancellationReason": "Cancellation reason",
+      "defaultCancellationReason": "Cancelled by internal requester",
+      "cancellingCase": "Cancelling case...",
+      "goBack": "Go back",
+      "openSupplierPortal": "Open supplier portal",
+      "copySupplierLink": "Supplier Link",
+      "copyMagicLink": "Copy supplier magic link",
+      "magicLinkCopied": "Copied",
+      "invitationNotGenerated": "Invitation not generated yet."
+    },
+    "requirements": {
+      "title": "Document requirements",
+      "subtitle": "Requirement matrix and validation decisions",
+      "requirement": "Requirement",
+      "status": "Status",
+      "approver": "Approver",
+      "action": "Action",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approveProvisionally": "Approve provisionally",
+      "defaultComment": "Validated",
+      "apply": "Apply",
+      "applying": "Applying...",
+      "noAction": "No action available"
+    },
+    "compliance": {
+      "title": "Compliance status",
+      "poBlock": "PO Block",
+      "enabled": "Enabled",
+      "disabled": "Disabled",
+      "mandatoryPending": "Mandatory pending",
+      "mandatoryExpired": "Mandatory expired"
+    },
+    "timeline": {
+      "title": "Status timeline"
+    },
+    "metadata": {
+      "title": "Case metadata",
+      "requester": "Requester",
+      "supplierCategory": "Supplier category",
+      "source": "Source",
+      "sourceReference": "Source reference",
+      "sourceSystem": "Source system",
+      "requestedBySapUser": "SAP requester user",
+      "createdBy": "Created by",
+      "contact": "Contact",
+      "created": "Created"
+    }
+  },
+  "StatusBadge": {
+    "onboarding_initiated": "Onboarding Initiated",
+    "invitation_sent": "Invitation Sent",
+    "portal_accessed": "Portal Accessed",
+    "response_in_progress": "Response In Progress",
+    "submission_completed": "Submission Completed",
+    "validation_completed_pending_supplier_creation": "Validation Completed",
+    "supplier_created_in_sap": "Supplier Created In Sap",
+    "cancelled": "Cancelled"
+  },
+  "StatusTimeline": {
+    "actor": "User",
+    "action": {
+      "expiration_reminder_sent": "Expiration reminder sent"
+    }
+  },
+  "WorkflowSwimlane": {
+    "title": "Workflow",
+    "cancelled": "Case is cancelled.",
+    "steps": {
+      "onboarding_initiated": {
+        "lane": "Internal",
+        "label": "Onboarding initiated"
+      },
+      "invitation_sent": {
+        "lane": "Internal",
+        "label": "Invitation sent"
+      },
+      "portal_accessed": {
+        "lane": "Supplier",
+        "label": "Portal accessed"
+      },
+      "response_in_progress": {
+        "lane": "Supplier",
+        "label": "Response in progress"
+      },
+      "submission_completed": {
+        "lane": "Supplier",
+        "label": "Submission completed"
+      },
+      "validation_completed_pending_supplier_creation": {
+        "lane": "Validation",
+        "label": "Validation completed"
+      },
+      "supplier_created_in_sap": {
+        "lane": "SAP",
+        "label": "Supplier created in SAP"
+      }
+    }
+  },
+  "PortalSettings": {
+    "title": "Portal Settings",
+    "subtitle": "SLA windows for supplier onboarding",
+    "invitationOpenHours": "Max time to open onboarding invitation (hours)",
+    "onboardingCompletionDays": "Max time to complete onboarding (days)",
+    "saveSettings": "Save portal settings",
+    "savingSettings": "Saving settings...",
+    "supplierTypes": {
+      "title": "Supplier Types",
+      "subtitle": "Manage assignable supplier types",
+      "key": "Key",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "saving": "Saving...",
+      "newTypeLabel": "New supplier type label",
+      "newTypePlaceholder": "Example: Strategic Partner",
+      "addType": "Add type",
+      "addingType": "Adding..."
+    },
+    "supplierCategories": {
+      "title": "Supplier Categories",
+      "subtitle": "Assign funding, type, and location combinations",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "saving": "Saving...",
+      "funding": "Funding",
+      "type": "Type",
+      "location": "Location",
+      "displayLabel": "Display label",
+      "displayLabelPlaceholder": "Example: Non-Subsidized / Strategic Partner / National",
+      "addCategory": "Add category",
+      "addingCategory": "Adding..."
+    },
+    "requirementMatrix": {
+      "title": "Requirement Matrix",
+      "subtitle": "Edit document requirements for each supplier category",
+      "empty": "Create at least one supplier category to edit requirement mappings.",
+      "category": "Category",
+      "loadCategory": "Load category",
+      "editing": "Editing",
+      "document": "Document",
+      "level": "Level",
+      "action": "Action",
+      "save": "Save",
+      "saving": "Saving..."
+    },
+    "policy": {
+      "title": "Current policy",
+      "subtitle": "Latest compliance configuration",
+      "invitationSla": "Invitation open SLA",
+      "completionSla": "Completion SLA",
+      "lastUpdate": "Last update",
+      "hours": "hours",
+      "days": "days",
+      "by": "by"
+    }
+  },
+  "Users": {
+    "title": "Users",
+    "subtitle": "Role assignment and account status",
+    "displayName": "Display name",
+    "role": "Role",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "save": "Save",
+    "saving": "Saving...",
+    "addTitle": "Add user",
+    "addSubtitle": "Create a new internal account",
+    "email": "Email",
+    "createUser": "Create user",
+    "creatingUser": "Creating..."
+  },
+  "SupplierPortal": {
+    "title": "Supplier submission portal",
+    "subtitle": "Complete your onboarding details",
+    "supplier": "Supplier",
+    "submitted": "Response submitted. Internal team will continue the process.",
+    "address": "Address",
+    "country": "Country",
+    "submit": "Submit supplier response",
+    "submitting": "Submitting...",
+    "requiredDocsTitle": "Required documentation",
+    "requiredDocsSubtitle": "Documents requested for your category"
+  },
+  "NotFound": {
+    "title": "Resource not found",
+    "description": "The supplier case or invitation link is invalid, expired, or no longer available.",
+    "back": "Back to dashboard"
+  }
+}

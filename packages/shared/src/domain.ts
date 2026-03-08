@@ -13,17 +13,30 @@ export const supplierCategoryCodes = [
   "NSUB-ONE-INT"
 ] as const;
 
-export type SupplierCategoryCode = (typeof supplierCategoryCodes)[number];
+export type SupplierCategoryCode = string;
 
 export const supportedLocales = ["en", "es"] as const;
 
 export type SupportedLocale = (typeof supportedLocales)[number];
 
-export type FundingType = "subsidized" | "non_subsidized";
+export const fundingTypes = ["subsidized", "non_subsidized"] as const;
 
-export type SupplierType = "subcontractor" | "standard" | "ecommerce" | "one_time";
+export type FundingType = (typeof fundingTypes)[number];
 
-export type LocationType = "national" | "international";
+export type SupplierType = string;
+
+export const locationTypes = ["national", "international"] as const;
+
+export type LocationType = (typeof locationTypes)[number];
+
+export interface SupplierTypeDefinition {
+  id: string;
+  key: SupplierType;
+  label: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface SupplierCategory {
   code: SupplierCategoryCode;
@@ -48,6 +61,19 @@ export const supplierCategories: readonly SupplierCategory[] = [
   { code: "NSUB-ONE-INT", funding: "non_subsidized", type: "one_time", location: "international", label: "Non-Subsidized / One-Time / International" }
 ] as const;
 
+export interface SupplierCategoryDefinition {
+  code: SupplierCategoryCode;
+  funding: FundingType;
+  typeId: string;
+  typeKey: SupplierType;
+  typeLabel: string;
+  location: LocationType;
+  label: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const documentCodes = [
   "FIN-01",
   "FIN-02",
@@ -66,7 +92,9 @@ export const documentCodes = [
 
 export type DocumentCode = (typeof documentCodes)[number];
 
-export type RequirementLevel = "mandatory" | "optional" | "not_applicable";
+export const requirementLevels = ["mandatory", "optional", "not_applicable"] as const;
+
+export type RequirementLevel = (typeof requirementLevels)[number];
 
 export type DocumentType = "internal" | "external" | "internal_or_external";
 
@@ -128,6 +156,10 @@ export const caseStatuses = [
 
 export type CaseStatus = (typeof caseStatuses)[number];
 
+export const caseSourceChannels = ["manual", "sap_pr"] as const;
+
+export type CaseSourceChannel = (typeof caseSourceChannels)[number];
+
 export const validationDecisions = ["approve", "reject", "approve_provisionally"] as const;
 
 export type ValidationDecision = (typeof validationDecisions)[number];
@@ -148,8 +180,31 @@ export interface RequirementRow {
   requirementLevel: RequirementLevel;
 }
 
+export interface RequirementMatrixEntry {
+  categoryCode: SupplierCategoryCode;
+  documentCode: DocumentCode;
+  requirementLevel: RequirementLevel;
+  updatedAt: string;
+  updatedBy: string;
+}
+
+export interface RequirementPreviewRow extends DocumentDefinition {
+  requirementLevel: RequirementLevel;
+}
+
 export interface StatusHistoryEntry {
   status: CaseStatus;
+  changedAt: string;
+  actor: string;
+  note: string;
+}
+
+export const caseActionTypes = ["expiration_reminder_sent"] as const;
+
+export type CaseActionType = (typeof caseActionTypes)[number];
+
+export interface ActionHistoryEntry {
+  actionType: CaseActionType;
   changedAt: string;
   actor: string;
   note: string;
@@ -181,6 +236,11 @@ export interface OnboardingCase {
   supplierContactEmail: string;
   requester: string;
   createdBy: string;
+  sourceChannel: CaseSourceChannel;
+  sourceSystem: string | null;
+  sourceReference: string | null;
+  requestedBySapUser: string | null;
+  sourceRequestedAt: string | null;
   categoryCode: SupplierCategoryCode;
   status: CaseStatus;
   invitationToken: string | null;
@@ -195,6 +255,7 @@ export interface OnboardingCase {
   createdAt: string;
   updatedAt: string;
   statusHistory: StatusHistoryEntry[];
+  actionHistory: ActionHistoryEntry[];
   documents: DocumentSubmission[];
 }
 
@@ -223,6 +284,33 @@ export interface PortalSettings {
   updatedBy: string;
 }
 
+export interface SupplierTypeCreateInput {
+  label: string;
+}
+
+export interface SupplierTypeStatusInput {
+  typeId: string;
+  active: boolean;
+}
+
+export interface SupplierCategoryCreateInput {
+  funding: FundingType;
+  typeId: string;
+  location: LocationType;
+  label: string;
+}
+
+export interface SupplierCategoryStatusInput {
+  categoryCode: SupplierCategoryCode;
+  active: boolean;
+}
+
+export interface RequirementMatrixUpdateInput {
+  categoryCode: SupplierCategoryCode;
+  documentCode: DocumentCode;
+  requirementLevel: RequirementLevel;
+}
+
 export interface CreateCaseInput {
   supplierName: string;
   supplierVat: string;
@@ -230,6 +318,23 @@ export interface CreateCaseInput {
   supplierContactEmail: string;
   requester: string;
   categoryCode: SupplierCategoryCode;
+}
+
+export interface SapPurchaseRequestNewSupplierInput {
+  sapPrId: string;
+  sapSystem: string;
+  requesterSapUserId: string;
+  requesterDisplayName: string;
+  supplierName: string;
+  supplierVat: string;
+  supplierContactName: string;
+  supplierContactEmail: string;
+  categoryCode: SupplierCategoryCode;
+  requestedAt: string;
+  costCenter?: string | undefined;
+  companyCode?: string | undefined;
+  purchasingOrg?: string | undefined;
+  notes?: string | undefined;
 }
 
 export interface SupplierSubmissionInput {
