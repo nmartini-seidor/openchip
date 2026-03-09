@@ -5,6 +5,11 @@ import {
   CaseStatus,
   CreateCaseInput,
   DocumentCode,
+  DocumentDefinition,
+  DocumentDefinitionCreateInput,
+  DocumentDefinitionStatusInput,
+  DocumentDefinitionUpdateInput,
+  DocumentTemplatePathUpdateInput,
   FundingType,
   DocumentSubmission,
   IntegrationEvent,
@@ -22,10 +27,14 @@ import {
   SupplierCategoryCode,
   SupplierSession,
   SupplierSubmissionInput,
+  SupplierDraftSaveInput,
+  SupplierOtpRequestInput,
+  SupplierOtpVerifyInput,
   SupplierBankAccount,
   SupplierTypeCreateInput,
   SupplierTypeDefinition,
   SupplierTypeStatusInput,
+  UpdateSupplierInfoInput,
   UserUpsertInput,
   ValidateDocumentInput
 } from "@openchip/shared";
@@ -37,6 +46,8 @@ import { getSupplierConfigStore, SupplierConfigStore } from "./supplier-config-s
 const INVITATION_TTL_DAYS = 14;
 const DEFAULT_INVITATION_OPEN_HOURS = 48;
 const DEFAULT_ONBOARDING_COMPLETION_DAYS = 14;
+const SUPPLIER_OTP_TTL_MINUTES = 10;
+const SUPPLIER_OTP_MAX_ATTEMPTS = 5;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -54,11 +65,35 @@ function addHours(base: Date, hours: number): Date {
   return copy;
 }
 
+function addMinutes(base: Date, minutes: number): Date {
+  const copy = new Date(base);
+  copy.setMinutes(copy.getMinutes() + minutes);
+  return copy;
+}
+
+function createOtpCode(): string {
+  return `${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
 function cloneCase(onboardingCase: OnboardingCase): OnboardingCase {
   return {
     ...onboardingCase,
     slaSnapshot: { ...onboardingCase.slaSnapshot },
+    supplierAddress: onboardingCase.supplierAddress === null ? null : { ...onboardingCase.supplierAddress },
     supplierBankAccount: onboardingCase.supplierBankAccount === null ? null : { ...onboardingCase.supplierBankAccount },
+    supplierDraft:
+      onboardingCase.supplierDraft === null
+        ? null
+        : {
+            address: { ...onboardingCase.supplierDraft.address },
+            bankAccount: { ...onboardingCase.supplierDraft.bankAccount },
+            uploadedDocuments: onboardingCase.supplierDraft.uploadedDocuments.map((item) => ({
+              code: item.code,
+              files: item.files.map((file) => ({ ...file }))
+            })),
+            updatedAt: onboardingCase.supplierDraft.updatedAt
+          },
+    supplierOtpState: { ...onboardingCase.supplierOtpState },
     statusHistory: onboardingCase.statusHistory.map((entry) => ({ ...entry })),
     actionHistory: (onboardingCase.actionHistory ?? []).map((entry) => ({ ...entry })),
     documents: onboardingCase.documents.map((document) => ({
@@ -229,6 +264,7 @@ export interface OnboardingRepository {
     sourceReference: string
   ): Promise<OnboardingCase | null>;
   createCase(input: CreateCaseInput, actor?: string, options?: CreateCaseOptions): Promise<OnboardingCase>;
+  updateSupplierInfo(input: UpdateSupplierInfoInput, actor: string): Promise<OnboardingCase>;
   sendInvitation(caseId: string, actor: string): Promise<OnboardingCase>;
   getCaseByInvitationToken(token: string): Promise<OnboardingCase | null>;
   getSupplierSession(token: string): Promise<SupplierSession | null>;
@@ -257,6 +293,12 @@ export interface OnboardingRepository {
   getSupplierCategory(categoryCode: SupplierCategoryCode): Promise<SupplierCategoryDefinition | null>;
   createSupplierCategory(input: SupplierCategoryCreateInput, actor: string): Promise<SupplierCategoryDefinition>;
   setSupplierCategoryStatus(input: SupplierCategoryStatusInput, actor: string): Promise<SupplierCategoryDefinition>;
+  listDocumentDefinitions(includeInactive?: boolean): Promise<DocumentDefinition[]>;
+  getDocumentDefinition(code: DocumentCode): Promise<DocumentDefinition | null>;
+  createDocumentDefinition(input: DocumentDefinitionCreateInput, actor: string): Promise<DocumentDefinition>;
+  updateDocumentDefinition(input: DocumentDefinitionUpdateInput, actor: string): Promise<DocumentDefinition>;
+  setDocumentDefinitionStatus(input: DocumentDefinitionStatusInput, actor: string): Promise<DocumentDefinition>;
+  setDocumentTemplatePath(input: DocumentTemplatePathUpdateInput, actor: string): Promise<DocumentDefinition>;
   listRequirementMatrixEntries(categoryCode: SupplierCategoryCode): Promise<RequirementMatrixEntry[]>;
   updateRequirementMatrixEntry(input: RequirementMatrixUpdateInput, actor: string): Promise<RequirementMatrixEntry>;
   getRequirementPreview(categoryCode: SupplierCategoryCode): Promise<RequirementPreviewRow[]>;
@@ -273,6 +315,10 @@ export interface OnboardingRepository {
     mode: "workflow" | "fallback"
   ): Promise<OnboardingCase>;
   recordCaseAction(caseId: string, actor: string, actionType: CaseActionType, note: string): Promise<OnboardingCase>;
+  requestSupplierOtp(input: SupplierOtpRequestInput, actor: string): Promise<OnboardingCase>;
+  verifySupplierOtp(input: SupplierOtpVerifyInput, actor: string): Promise<OnboardingCase>;
+  saveSupplierDraft(input: SupplierDraftSaveInput, actor: string): Promise<OnboardingCase>;
+  upsertSupplierDraftDocuments(token: string, documents: SupplierSubmissionInput["uploadedDocuments"], actor: string): Promise<OnboardingCase>;
 }
 
 class InMemoryOnboardingRepository implements OnboardingRepository {
@@ -376,6 +422,14 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       supplierAddress: null,
       supplierCountry: null,
       supplierBankAccount: null,
+      supplierDraft: null,
+      supplierOtpState: {
+        code: null,
+        expiresAt: null,
+        attemptsRemaining: SUPPLIER_OTP_MAX_ATTEMPTS,
+        requestedAt: null,
+        verifiedAt: null
+      },
       createdAt,
       updatedAt: createdAt,
       statusHistory: [
@@ -405,6 +459,66 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
         ...options.integrationPayload
       });
     }
+
+    return cloneCase(onboardingCase);
+  }
+
+  async updateSupplierInfo(input: UpdateSupplierInfoInput, actor: string): Promise<OnboardingCase> {
+    const onboardingCase = assertCaseExists(this.store.cases.get(input.caseId), input.caseId);
+
+    if (onboardingCase.status === "supplier_created_in_sap" || onboardingCase.status === "cancelled") {
+      throw new Error("Supplier information can only be edited before SAP creation or cancellation.");
+    }
+
+    const duplicateCase = [...this.store.cases.values()].find(
+      (candidate) =>
+        candidate.id !== input.caseId &&
+        candidate.status !== "cancelled" &&
+        candidate.supplierVat.toLowerCase() === input.supplierVat.toLowerCase()
+    );
+
+    if (duplicateCase !== undefined) {
+      throw new Error("A supplier with the same VAT already exists in onboarding.");
+    }
+
+    const changedFields: string[] = [];
+
+    if (onboardingCase.supplierName !== input.supplierName) {
+      onboardingCase.supplierName = input.supplierName;
+      changedFields.push("supplierName");
+    }
+
+    if (onboardingCase.supplierVat !== input.supplierVat) {
+      onboardingCase.supplierVat = input.supplierVat;
+      changedFields.push("supplierVat");
+    }
+
+    if (onboardingCase.supplierContactName !== input.supplierContactName) {
+      onboardingCase.supplierContactName = input.supplierContactName;
+      changedFields.push("supplierContactName");
+    }
+
+    if (onboardingCase.supplierContactEmail !== input.supplierContactEmail) {
+      onboardingCase.supplierContactEmail = input.supplierContactEmail;
+      changedFields.push("supplierContactEmail");
+    }
+
+    if (changedFields.length === 0) {
+      return cloneCase(onboardingCase);
+    }
+
+    const changedAt = nowIso();
+    onboardingCase.updatedAt = changedAt;
+    onboardingCase.actionHistory.push({
+      actionType: "supplier_info_updated",
+      changedAt,
+      actor,
+      note: `Updated supplier fields: ${changedFields.join(", ")}`
+    });
+
+    this.pushEvent(onboardingCase, "supplier_info_updated", actor, {
+      changedFields: changedFields.join(",")
+    });
 
     return cloneCase(onboardingCase);
   }
@@ -460,7 +574,9 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     return {
       token,
       caseId: onboardingCase.id,
-      expiresAt: onboardingCase.invitationExpiresAt
+      expiresAt: onboardingCase.invitationExpiresAt,
+      otpVerified: onboardingCase.supplierOtpState.verifiedAt !== null,
+      supplierContactEmail: onboardingCase.supplierContactEmail
     };
   }
 
@@ -480,6 +596,169 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       this.pushHistory(onboardingCase, nextStatus, actor, "Supplier accessed the portal");
       this.pushEvent(onboardingCase, "portal_accessed", actor, {});
     }
+
+    return cloneCase(onboardingCase);
+  }
+
+  async requestSupplierOtp(input: SupplierOtpRequestInput, actor: string): Promise<OnboardingCase> {
+    const onboardingCase = [...this.store.cases.values()].find((candidate) => candidate.invitationToken === input.token);
+    if (onboardingCase === undefined || onboardingCase.invitationExpiresAt === null) {
+      throw new Error("Invalid supplier invitation token.");
+    }
+
+    if (new Date(onboardingCase.invitationExpiresAt).getTime() < Date.now()) {
+      throw new Error("Supplier invitation has expired.");
+    }
+
+    const requestedAt = nowIso();
+    onboardingCase.supplierOtpState = {
+      code: createOtpCode(),
+      expiresAt: addMinutes(new Date(requestedAt), SUPPLIER_OTP_TTL_MINUTES).toISOString(),
+      attemptsRemaining: SUPPLIER_OTP_MAX_ATTEMPTS,
+      requestedAt,
+      verifiedAt: null
+    };
+    onboardingCase.updatedAt = requestedAt;
+
+    this.pushEvent(onboardingCase, "supplier_otp_requested", actor, {
+      expiresAt: onboardingCase.supplierOtpState.expiresAt ?? "unknown"
+    });
+
+    return cloneCase(onboardingCase);
+  }
+
+  async verifySupplierOtp(input: SupplierOtpVerifyInput, actor: string): Promise<OnboardingCase> {
+    const onboardingCase = [...this.store.cases.values()].find((candidate) => candidate.invitationToken === input.token);
+    if (onboardingCase === undefined || onboardingCase.invitationExpiresAt === null) {
+      throw new Error("Invalid supplier invitation token.");
+    }
+
+    if (new Date(onboardingCase.invitationExpiresAt).getTime() < Date.now()) {
+      throw new Error("Supplier invitation has expired.");
+    }
+
+    const otpState = onboardingCase.supplierOtpState;
+    if (otpState.code === null || otpState.expiresAt === null) {
+      throw new Error("OTP has not been requested.");
+    }
+    if (new Date(otpState.expiresAt).getTime() < Date.now()) {
+      throw new Error("OTP has expired.");
+    }
+    if (otpState.attemptsRemaining <= 0) {
+      throw new Error("OTP attempts exceeded.");
+    }
+
+    if (otpState.code !== input.otpCode) {
+      otpState.attemptsRemaining -= 1;
+      onboardingCase.updatedAt = nowIso();
+      this.pushEvent(onboardingCase, "supplier_otp_failed", actor, {
+        attemptsRemaining: otpState.attemptsRemaining.toString()
+      });
+      throw new Error("Invalid OTP.");
+    }
+
+    const verifiedAt = nowIso();
+    onboardingCase.supplierOtpState = {
+      ...otpState,
+      code: null,
+      verifiedAt
+    };
+    onboardingCase.updatedAt = verifiedAt;
+    this.pushEvent(onboardingCase, "supplier_otp_verified", actor, {});
+    return cloneCase(onboardingCase);
+  }
+
+  async saveSupplierDraft(input: SupplierDraftSaveInput, actor: string): Promise<OnboardingCase> {
+    const onboardingCase = [...this.store.cases.values()].find((candidate) => candidate.invitationToken === input.token);
+    if (onboardingCase === undefined || onboardingCase.invitationExpiresAt === null) {
+      throw new Error("Invalid supplier invitation token.");
+    }
+
+    if (onboardingCase.status === "invitation_sent") {
+      const accessedStatus = transitionCaseStatus(onboardingCase.status, "portal_accessed");
+      this.pushHistory(onboardingCase, accessedStatus, actor, "Supplier accessed portal during draft save");
+    }
+    if (onboardingCase.status === "portal_accessed") {
+      const progressStatus = transitionCaseStatus(onboardingCase.status, "response_in_progress");
+      this.pushHistory(onboardingCase, progressStatus, actor, "Supplier started response");
+    }
+
+    const currentDraft = onboardingCase.supplierDraft ?? {
+      address: {},
+      bankAccount: {},
+      uploadedDocuments: [],
+      updatedAt: nowIso()
+    };
+
+    onboardingCase.supplierDraft = {
+      address: {
+        ...currentDraft.address,
+        ...input.address
+      },
+      bankAccount: {
+        ...currentDraft.bankAccount,
+        ...input.bankAccount
+      },
+      uploadedDocuments: currentDraft.uploadedDocuments.map((entry) => ({
+        code: entry.code,
+        files: entry.files.map((file) => ({ ...file }))
+      })),
+      updatedAt: nowIso()
+    };
+    onboardingCase.updatedAt = onboardingCase.supplierDraft.updatedAt;
+    this.pushEvent(onboardingCase, "supplier_draft_saved", actor, {});
+    return cloneCase(onboardingCase);
+  }
+
+  async upsertSupplierDraftDocuments(
+    token: string,
+    documents: SupplierSubmissionInput["uploadedDocuments"],
+    actor: string
+  ): Promise<OnboardingCase> {
+    const onboardingCase = [...this.store.cases.values()].find((candidate) => candidate.invitationToken === token);
+    if (onboardingCase === undefined || onboardingCase.invitationExpiresAt === null) {
+      throw new Error("Invalid supplier invitation token.");
+    }
+
+    const currentDraft = onboardingCase.supplierDraft ?? {
+      address: {},
+      bankAccount: {},
+      uploadedDocuments: [],
+      updatedAt: nowIso()
+    };
+
+    const mapByCode = new Map<string, UploadedDocumentFile[]>();
+    for (const existing of currentDraft.uploadedDocuments) {
+      mapByCode.set(existing.code, [...existing.files]);
+    }
+    for (const incoming of documents) {
+      const currentFiles = mapByCode.get(incoming.code) ?? [];
+      currentFiles.push(...incoming.files.map((file) => ({ ...file })));
+      mapByCode.set(incoming.code, currentFiles);
+    }
+
+    onboardingCase.supplierDraft = {
+      ...currentDraft,
+      uploadedDocuments: [...mapByCode.entries()].map(([code, files]) => ({
+        code,
+        files
+      })),
+      updatedAt: nowIso()
+    };
+    onboardingCase.updatedAt = onboardingCase.supplierDraft.updatedAt;
+
+    if (onboardingCase.status === "invitation_sent") {
+      const accessedStatus = transitionCaseStatus(onboardingCase.status, "portal_accessed");
+      this.pushHistory(onboardingCase, accessedStatus, actor, "Supplier accessed portal during document upload");
+    }
+    if (onboardingCase.status === "portal_accessed") {
+      const progressStatus = transitionCaseStatus(onboardingCase.status, "response_in_progress");
+      this.pushHistory(onboardingCase, progressStatus, actor, "Supplier started response");
+    }
+
+    this.pushEvent(onboardingCase, "supplier_draft_documents_upserted", actor, {
+      documentCount: onboardingCase.supplierDraft.uploadedDocuments.length.toString()
+    });
 
     return cloneCase(onboardingCase);
   }
@@ -509,13 +788,18 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       throw new Error("Supplier response can only be submitted from response_in_progress status.");
     }
 
-    onboardingCase.supplierAddress = input.address;
-    onboardingCase.supplierCountry = input.country;
+    onboardingCase.supplierAddress = { ...input.address };
+    onboardingCase.supplierCountry = input.address.country;
     onboardingCase.supplierBankAccount = cloneBankAccount(input.bankAccount);
 
     const requirements = await this.supplierConfigStore.listRequirementPreviewRows(onboardingCase.categoryCode);
     const uploadedDocumentsByCode = new Map<DocumentCode, UploadedDocumentFile[]>();
-    for (const uploadedDocument of input.uploadedDocuments) {
+    const allUploadedDocuments =
+      input.uploadedDocuments.length > 0
+        ? input.uploadedDocuments
+        : onboardingCase.supplierDraft?.uploadedDocuments ?? [];
+
+    for (const uploadedDocument of allUploadedDocuments) {
       const existing = uploadedDocumentsByCode.get(uploadedDocument.code);
       if (existing === undefined) {
         uploadedDocumentsByCode.set(uploadedDocument.code, [...uploadedDocument.files]);
@@ -539,6 +823,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     }
 
     onboardingCase.documents = documents;
+    onboardingCase.supplierDraft = null;
 
     const nextStatus = transitionCaseStatus(onboardingCase.status, "submission_completed");
     this.pushHistory(onboardingCase, nextStatus, actor, "Supplier submission completed");
@@ -901,6 +1186,30 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     return this.supplierConfigStore.setSupplierCategoryStatus(input, actor);
   }
 
+  async listDocumentDefinitions(includeInactive?: boolean): Promise<DocumentDefinition[]> {
+    return this.supplierConfigStore.listDocumentDefinitions(includeInactive);
+  }
+
+  async getDocumentDefinition(code: DocumentCode): Promise<DocumentDefinition | null> {
+    return this.supplierConfigStore.getDocumentDefinition(code);
+  }
+
+  async createDocumentDefinition(input: DocumentDefinitionCreateInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.createDocumentDefinition(input, actor);
+  }
+
+  async updateDocumentDefinition(input: DocumentDefinitionUpdateInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.updateDocumentDefinition(input, actor);
+  }
+
+  async setDocumentDefinitionStatus(input: DocumentDefinitionStatusInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.setDocumentDefinitionStatus(input, actor);
+  }
+
+  async setDocumentTemplatePath(input: DocumentTemplatePathUpdateInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.setDocumentTemplatePath(input, actor);
+  }
+
   async listRequirementMatrixEntries(categoryCode: SupplierCategoryCode): Promise<RequirementMatrixEntry[]> {
     return this.supplierConfigStore.listRequirementMatrixEntries(categoryCode);
   }
@@ -970,6 +1279,57 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+function normalizePersistedCase(rawCase: OnboardingCase): OnboardingCase {
+  const rawAddress = rawCase.supplierAddress;
+  const normalizedAddress =
+    rawAddress !== null &&
+    typeof rawAddress === "object" &&
+    "street" in rawAddress &&
+    "city" in rawAddress &&
+    "postalCode" in rawAddress &&
+    "country" in rawAddress
+      ? {
+          street: String(rawAddress.street),
+          city: String(rawAddress.city),
+          postalCode: String(rawAddress.postalCode),
+          country: String(rawAddress.country)
+        }
+      : null;
+
+  return {
+    ...rawCase,
+    supplierAddress: normalizedAddress,
+    supplierDraft:
+      rawCase.supplierDraft === undefined || rawCase.supplierDraft === null
+        ? null
+        : {
+            address: rawCase.supplierDraft.address ?? {},
+            bankAccount: rawCase.supplierDraft.bankAccount ?? {},
+            uploadedDocuments: (rawCase.supplierDraft.uploadedDocuments ?? []).map((entry) => ({
+              code: entry.code,
+              files: entry.files ?? []
+            })),
+            updatedAt: rawCase.supplierDraft.updatedAt ?? nowIso()
+          },
+    supplierOtpState:
+      rawCase.supplierOtpState === undefined
+        ? {
+            code: null,
+            expiresAt: null,
+            attemptsRemaining: SUPPLIER_OTP_MAX_ATTEMPTS,
+            requestedAt: null,
+            verifiedAt: null
+          }
+        : {
+            code: rawCase.supplierOtpState.code ?? null,
+            expiresAt: rawCase.supplierOtpState.expiresAt ?? null,
+            attemptsRemaining: rawCase.supplierOtpState.attemptsRemaining ?? SUPPLIER_OTP_MAX_ATTEMPTS,
+            requestedAt: rawCase.supplierOtpState.requestedAt ?? null,
+            verifiedAt: rawCase.supplierOtpState.verifiedAt ?? null
+          }
+  };
+}
+
 function fromPersistedStorePayload(payload: unknown): Store {
   if (!isRecord(payload)) {
     return createStore();
@@ -987,7 +1347,7 @@ function fromPersistedStorePayload(payload: unknown): Store {
   const cases = new Map<string, OnboardingCase>();
   for (const onboardingCase of rawCases) {
     if (isRecord(onboardingCase) && typeof onboardingCase.id === "string") {
-      cases.set(onboardingCase.id, onboardingCase as unknown as OnboardingCase);
+      cases.set(onboardingCase.id, normalizePersistedCase(onboardingCase as unknown as OnboardingCase));
     }
   }
 
@@ -1118,6 +1478,10 @@ class PostgresOnboardingRepository implements OnboardingRepository {
     return this.withWriteStore((repository) => repository.createCase(input, actor, options));
   }
 
+  async updateSupplierInfo(input: UpdateSupplierInfoInput, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.updateSupplierInfo(input, actor));
+  }
+
   async sendInvitation(caseId: string, actor: string): Promise<OnboardingCase> {
     return this.withWriteStore((repository) => repository.sendInvitation(caseId, actor));
   }
@@ -1230,6 +1594,30 @@ class PostgresOnboardingRepository implements OnboardingRepository {
     return this.supplierConfigStore.setSupplierCategoryStatus(input, actor);
   }
 
+  async listDocumentDefinitions(includeInactive?: boolean): Promise<DocumentDefinition[]> {
+    return this.supplierConfigStore.listDocumentDefinitions(includeInactive);
+  }
+
+  async getDocumentDefinition(code: DocumentCode): Promise<DocumentDefinition | null> {
+    return this.supplierConfigStore.getDocumentDefinition(code);
+  }
+
+  async createDocumentDefinition(input: DocumentDefinitionCreateInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.createDocumentDefinition(input, actor);
+  }
+
+  async updateDocumentDefinition(input: DocumentDefinitionUpdateInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.updateDocumentDefinition(input, actor);
+  }
+
+  async setDocumentDefinitionStatus(input: DocumentDefinitionStatusInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.setDocumentDefinitionStatus(input, actor);
+  }
+
+  async setDocumentTemplatePath(input: DocumentTemplatePathUpdateInput, actor: string): Promise<DocumentDefinition> {
+    return this.supplierConfigStore.setDocumentTemplatePath(input, actor);
+  }
+
   async listRequirementMatrixEntries(categoryCode: SupplierCategoryCode): Promise<RequirementMatrixEntry[]> {
     return this.supplierConfigStore.listRequirementMatrixEntries(categoryCode);
   }
@@ -1266,6 +1654,26 @@ class PostgresOnboardingRepository implements OnboardingRepository {
 
   async recordCaseAction(caseId: string, actor: string, actionType: CaseActionType, note: string): Promise<OnboardingCase> {
     return this.withWriteStore((repository) => repository.recordCaseAction(caseId, actor, actionType, note));
+  }
+
+  async requestSupplierOtp(input: SupplierOtpRequestInput, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.requestSupplierOtp(input, actor));
+  }
+
+  async verifySupplierOtp(input: SupplierOtpVerifyInput, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.verifySupplierOtp(input, actor));
+  }
+
+  async saveSupplierDraft(input: SupplierDraftSaveInput, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.saveSupplierDraft(input, actor));
+  }
+
+  async upsertSupplierDraftDocuments(
+    token: string,
+    documents: SupplierSubmissionInput["uploadedDocuments"],
+    actor: string
+  ): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.upsertSupplierDraftDocuments(token, documents, actor));
   }
 }
 

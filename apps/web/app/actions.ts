@@ -5,7 +5,10 @@ import { redirect } from "next/navigation";
 import { createMockDocuwareAdapter, createMockSapAdapter } from "@openchip/integrations";
 import {
   createCaseInputSchema,
-  documentCodes,
+  documentCodeSchema,
+  documentDefinitionCreateSchema,
+  documentDefinitionStatusSchema,
+  documentDefinitionUpdateSchema,
   DocumentCode,
   identifierSchema,
   invitationTokenSchema,
@@ -14,19 +17,27 @@ import {
   requirementMatrixUpdateSchema,
   supplierCategoryCreateSchema,
   supplierCategoryStatusSchema,
-  SupplierSubmissionInput,
+  supplierDraftSaveSchema,
+  supplierOtpRequestSchema,
+  supplierOtpVerifySchema,
   userUpsertSchema,
   supplierTypeCreateSchema,
   supplierTypeStatusSchema,
+  updateSupplierInfoInputSchema,
   validateDocumentSchema,
   supplierSubmissionSchema,
   InternalRole
 } from "@openchip/shared";
 import { evaluateCompliance } from "@openchip/workflow";
 import { actorFromSession, requireSessionRole, requireSessionUser } from "@/lib/auth";
-import { saveSupplierDocument } from "@/lib/document-storage";
+import { saveDocumentTemplate } from "@/lib/document-storage";
 import { getEmailAdapter } from "@/lib/email";
 import { onboardingRepository } from "@/lib/repository";
+import {
+  clearSupplierPortalSession,
+  createSupplierPortalSession,
+  hasSupplierPortalSession
+} from "@/lib/supplier-session";
 import { triggerCaseWorkflows } from "@/lib/workflow-runner";
 
 function readFormValue(formData: FormData, key: string): string {
@@ -53,21 +64,18 @@ function readOptionalFormValue(formData: FormData, key: string): string | undefi
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
-function isDocumentCode(value: string): value is DocumentCode {
-  return (documentCodes as readonly string[]).includes(value);
-}
-
-function readUploadedFiles(formData: FormData, key: string): File[] {
-  const values = formData.getAll(key);
-  const files: File[] = [];
-
-  for (const value of values) {
-    if (value instanceof File && value.size > 0) {
-      files.push(value);
+function omitUndefined<T extends Record<string, string | undefined>>(value: T): { [K in keyof T]?: string } {
+  const result: Partial<Record<keyof T, string>> = {};
+  for (const [key, entry] of Object.entries(value) as [keyof T, string | undefined][]) {
+    if (entry !== undefined) {
+      result[key] = entry;
     }
   }
+  return result as { [K in keyof T]?: string };
+}
 
-  return files;
+function parseDocumentCode(value: string): DocumentCode {
+  return documentCodeSchema.parse(value);
 }
 
 function hasRole(role: InternalRole, allowedRoles: readonly InternalRole[]): boolean {
@@ -110,6 +118,40 @@ export async function createCaseAction(formData: FormData): Promise<void> {
   redirect(`/cases/${onboardingCaseId}`);
 }
 
+export async function updateSupplierInfoAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(onboardingInitiatorRoles);
+
+  const fallbackCaseId = readFormValueOrEmpty(formData, "caseId");
+  const parsed = updateSupplierInfoInputSchema.safeParse({
+    caseId: fallbackCaseId,
+    supplierName: readFormValueOrEmpty(formData, "supplierName"),
+    supplierVat: readFormValueOrEmpty(formData, "supplierVat"),
+    supplierContactName: readFormValueOrEmpty(formData, "supplierContactName"),
+    supplierContactEmail: readFormValueOrEmpty(formData, "supplierContactEmail")
+  });
+
+  if (!parsed.success) {
+    redirect(`/cases/${fallbackCaseId}?toast=supplier_info_update_invalid`);
+  }
+
+  const { caseId } = parsed.data;
+  try {
+    await onboardingRepository.updateSupplierInfo(parsed.data, actorFromSession(user));
+  } catch (error) {
+    if (error instanceof Error && error.message.toLowerCase().includes("same vat")) {
+      redirect(`/cases/${caseId}?toast=supplier_info_update_duplicate_vat`);
+    }
+    if (error instanceof Error && error.message.toLowerCase().includes("can only be edited before sap creation")) {
+      redirect(`/cases/${caseId}?toast=supplier_info_update_locked`);
+    }
+    redirect(`/cases/${caseId}?toast=supplier_info_update_failed`);
+  }
+
+  revalidatePath(`/cases/${caseId}`);
+  revalidatePath("/");
+  redirect(`/cases/${caseId}?toast=supplier_info_updated`);
+}
+
 export async function sendInvitationAction(formData: FormData): Promise<void> {
   const user = await requireSessionRole(onboardingInitiatorRoles);
 
@@ -142,11 +184,25 @@ export async function sendInvitationAction(formData: FormData): Promise<void> {
 
 export async function supplierSubmitAction(formData: FormData): Promise<void> {
   const token = invitationTokenSchema.parse(readFormValue(formData, "token"));
+  const session = await onboardingRepository.getSupplierSession(token);
+  if (session === null) {
+    await clearSupplierPortalSession();
+    redirect(`/supplier/${token}?error=expired`);
+  }
+
+  const hasPortalSession = await hasSupplierPortalSession(token, session.caseId);
+  if (!hasPortalSession || !session.otpVerified) {
+    redirect(`/supplier/${token}?error=otp-required`);
+  }
 
   const baseSubmission = supplierSubmissionSchema.safeParse({
     token,
-    address: readFormValueOrEmpty(formData, "address"),
-    country: readFormValueOrEmpty(formData, "country"),
+    address: {
+      street: readFormValueOrEmpty(formData, "street"),
+      city: readFormValueOrEmpty(formData, "city"),
+      postalCode: readFormValueOrEmpty(formData, "postalCode"),
+      country: readFormValueOrEmpty(formData, "country")
+    },
     bankAccount: {
       bkvid: readFormValueOrEmpty(formData, "bkvid"),
       banks: readFormValueOrEmpty(formData, "banks"),
@@ -154,8 +210,8 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
       bankn: readOptionalFormValue(formData, "bankn"),
       bkont: readOptionalFormValue(formData, "bkont"),
       accname: readFormValueOrEmpty(formData, "accname"),
-      bkValidFrom: readFormValueOrEmpty(formData, "bkValidFrom"),
-      bkValidTo: readFormValueOrEmpty(formData, "bkValidTo"),
+      bkValidFrom: readOptionalFormValue(formData, "bkValidFrom"),
+      bkValidTo: readOptionalFormValue(formData, "bkValidTo"),
       iban: readOptionalFormValue(formData, "iban")
     },
     uploadedDocuments: []
@@ -165,61 +221,16 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
     redirect(`/supplier/${token}?error=validation`);
   }
 
-  const session = await onboardingRepository.getSupplierSession(token);
-  if (session === null) {
-    redirect(`/supplier/${token}?error=expired`);
-  }
-
   const onboardingCase = await onboardingRepository.getCase(session.caseId);
   if (onboardingCase === null) {
     redirect(`/supplier/${token}?error=not-found`);
   }
 
-  const requirements = await onboardingRepository.getRequirementSummary(onboardingCase.categoryCode);
-  const selectedFilesByCode = new Map<DocumentCode, File[]>();
-
-  for (const requirement of requirements) {
-    const files = readUploadedFiles(formData, `documentFiles.${requirement.code}`);
-    selectedFilesByCode.set(requirement.code, files);
-  }
-
-  const hasMissingMandatoryFiles = requirements.some(
-    (requirement) => requirement.requirementLevel === "mandatory" && (selectedFilesByCode.get(requirement.code)?.length ?? 0) === 0
-  );
-  if (hasMissingMandatoryFiles) {
-    redirect(`/supplier/${token}?error=missing-mandatory-documents`);
-  }
-
-  const uploadedDocuments: SupplierSubmissionInput["uploadedDocuments"] = [];
-  for (const [code, files] of selectedFilesByCode.entries()) {
-    if (files.length === 0) {
-      continue;
-    }
-
-    const savedFiles: SupplierSubmissionInput["uploadedDocuments"][number]["files"] = [];
-    for (const file of files) {
-      savedFiles.push(
-        await saveSupplierDocument({
-          caseId: onboardingCase.id,
-          code,
-          uploadedBy: "supplier.portal",
-          file
-        })
-      );
-    }
-
-    uploadedDocuments.push({
-      code,
-      files: savedFiles
-    });
-  }
-
   const payload = supplierSubmissionSchema.safeParse({
     token,
     address: baseSubmission.data.address,
-    country: baseSubmission.data.country,
     bankAccount: baseSubmission.data.bankAccount,
-    uploadedDocuments
+    uploadedDocuments: []
   });
 
   if (!payload.success) {
@@ -232,10 +243,116 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
     revalidatePath(`/cases/${updatedCase.id}`);
     revalidatePath("/");
   } catch {
-    redirect(`/supplier/${token}?error=validation`);
+    redirect(`/supplier/${token}?error=missing-mandatory-documents`);
   }
 
   redirect(`/supplier/${token}?submitted=1`);
+}
+
+export async function requestSupplierOtpAction(formData: FormData): Promise<void> {
+  const parsed = supplierOtpRequestSchema.parse({
+    token: readFormValue(formData, "token")
+  });
+
+  const session = await onboardingRepository.getSupplierSession(parsed.token);
+  if (session === null) {
+    await clearSupplierPortalSession();
+    redirect(`/supplier/${parsed.token}?error=expired`);
+  }
+
+  try {
+    const onboardingCase = await onboardingRepository.requestSupplierOtp(parsed, "supplier.portal");
+    if (onboardingCase.supplierOtpState.code !== null && onboardingCase.supplierOtpState.expiresAt !== null) {
+      try {
+        const emailAdapter = getEmailAdapter();
+        await emailAdapter.sendSupplierOtpEmail({
+          to: session.supplierContactEmail,
+          supplierName: onboardingCase.supplierName,
+          otpCode: onboardingCase.supplierOtpState.code,
+          expiresAt: onboardingCase.supplierOtpState.expiresAt
+        });
+      } catch {
+        // Keep OTP flow available even if email delivery channel is temporarily unavailable.
+      }
+    }
+  } catch {
+    redirect(`/supplier/${parsed.token}?otp=failed`);
+  }
+
+  revalidatePath(`/supplier/${parsed.token}`);
+  redirect(`/supplier/${parsed.token}?otp=requested`);
+}
+
+export async function verifySupplierOtpAction(formData: FormData): Promise<void> {
+  const parsed = supplierOtpVerifySchema.parse({
+    token: readFormValue(formData, "token"),
+    otpCode: readFormValue(formData, "otpCode")
+  });
+
+  try {
+    const onboardingCase = await onboardingRepository.verifySupplierOtp(parsed, "supplier.portal");
+    await createSupplierPortalSession({
+      token: parsed.token,
+      caseId: onboardingCase.id,
+      verifiedAt: onboardingCase.supplierOtpState.verifiedAt ?? new Date().toISOString()
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : "";
+    if (message.includes("expired")) {
+      redirect(`/supplier/${parsed.token}?otpError=expired`);
+    }
+    if (message.includes("attempts")) {
+      redirect(`/supplier/${parsed.token}?otpError=attempts`);
+    }
+    if (message.includes("not been requested")) {
+      redirect(`/supplier/${parsed.token}?otpError=not-requested`);
+    }
+    redirect(`/supplier/${parsed.token}?otpError=invalid`);
+  }
+
+  revalidatePath(`/supplier/${parsed.token}`);
+  redirect(`/supplier/${parsed.token}?otp=verified`);
+}
+
+export async function saveSupplierDraftAction(formData: FormData): Promise<void> {
+  const parsed = supplierDraftSaveSchema.parse({
+    token: readFormValue(formData, "token"),
+    address: {
+      street: readOptionalFormValue(formData, "street"),
+      city: readOptionalFormValue(formData, "city"),
+      postalCode: readOptionalFormValue(formData, "postalCode"),
+      country: readOptionalFormValue(formData, "country")
+    },
+    bankAccount: {
+      banks: readOptionalFormValue(formData, "banks"),
+      bankl: readOptionalFormValue(formData, "bankl"),
+      bankn: readOptionalFormValue(formData, "bankn"),
+      bkont: readOptionalFormValue(formData, "bkont"),
+      accname: readOptionalFormValue(formData, "accname"),
+      iban: readOptionalFormValue(formData, "iban")
+    }
+  });
+
+  const payload = {
+    token: parsed.token,
+    address: omitUndefined(parsed.address),
+    bankAccount: omitUndefined(parsed.bankAccount)
+  };
+
+  const session = await onboardingRepository.getSupplierSession(parsed.token);
+  if (session === null) {
+    await clearSupplierPortalSession();
+    redirect(`/supplier/${parsed.token}?error=expired`);
+  }
+
+  const hasPortalSession = await hasSupplierPortalSession(parsed.token, session.caseId);
+  if (!hasPortalSession || !session.otpVerified) {
+    redirect(`/supplier/${parsed.token}?error=otp-required`);
+  }
+
+  await onboardingRepository.saveSupplierDraft(payload, "supplier.portal");
+  revalidatePath(`/supplier/${payload.token}`);
+  redirect(`/supplier/${payload.token}?draft=saved`);
 }
 
 export async function validateDocumentAction(formData: FormData): Promise<void> {
@@ -370,13 +487,9 @@ export async function setDocumentExpiryAction(formData: FormData): Promise<void>
   }
 
   const caseId = identifierSchema.parse(readFormValue(formData, "caseId"));
-  const code = readFormValue(formData, "code");
+  const code = parseDocumentCode(readFormValue(formData, "code"));
   const validToRaw = readFormValueOrEmpty(formData, "validTo");
   const validTo = validToRaw.length > 0 ? validToRaw : null;
-
-  if (!isDocumentCode(code)) {
-    throw new Error("Invalid document code.");
-  }
 
   await onboardingRepository.setDocumentExpiry(caseId, code, validTo, actorFromSession(user));
   revalidatePath(`/cases/${caseId}`);
@@ -479,4 +592,88 @@ export async function updatePortalSettingsAction(formData: FormData): Promise<vo
   await onboardingRepository.updatePortalSettings(parsed, actorFromSession(user));
   revalidatePath("/portal-settings");
   revalidatePath("/");
+}
+
+export async function createDocumentDefinitionAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+
+  const parsed = documentDefinitionCreateSchema.parse({
+    code: readFormValue(formData, "code"),
+    labelEn: readFormValue(formData, "labelEn"),
+    labelEs: readFormValue(formData, "labelEs"),
+    type: readFormValue(formData, "type"),
+    expiryPolicy: readFormValue(formData, "expiryPolicy"),
+    owner: readFormValue(formData, "owner"),
+    blocksPurchaseOrders: readFormValueOrEmpty(formData, "blocksPurchaseOrders") === "true"
+  });
+
+  await onboardingRepository.createDocumentDefinition(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
+}
+
+export async function updateDocumentDefinitionAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+
+  const parsed = documentDefinitionUpdateSchema.parse({
+    code: readFormValue(formData, "code"),
+    labelEn: readFormValue(formData, "labelEn"),
+    labelEs: readFormValue(formData, "labelEs"),
+    type: readFormValue(formData, "type"),
+    expiryPolicy: readFormValue(formData, "expiryPolicy"),
+    owner: readFormValue(formData, "owner"),
+    blocksPurchaseOrders: readFormValueOrEmpty(formData, "blocksPurchaseOrders") === "true"
+  });
+
+  await onboardingRepository.updateDocumentDefinition(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
+}
+
+export async function setDocumentDefinitionStatusAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+  const parsed = documentDefinitionStatusSchema.parse({
+    code: readFormValue(formData, "code"),
+    active: readFormValueOrEmpty(formData, "active") === "true"
+  });
+
+  await onboardingRepository.setDocumentDefinitionStatus(parsed, actorFromSession(user));
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
+}
+
+export async function uploadDocumentTemplateAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+  const code = parseDocumentCode(readFormValue(formData, "code"));
+  const file = formData.get("templateFile");
+  if (!(file instanceof File) || file.size === 0) {
+    throw new Error("Template file is required.");
+  }
+
+  const storagePath = await saveDocumentTemplate({ code, file });
+  await onboardingRepository.setDocumentTemplatePath(
+    {
+      code,
+      templateStoragePath: storagePath
+    },
+    actorFromSession(user)
+  );
+
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
+}
+
+export async function clearDocumentTemplateAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+  const code = parseDocumentCode(readFormValue(formData, "code"));
+
+  await onboardingRepository.setDocumentTemplatePath(
+    {
+      code,
+      templateStoragePath: null
+    },
+    actorFromSession(user)
+  );
+
+  revalidatePath("/portal-settings");
 }

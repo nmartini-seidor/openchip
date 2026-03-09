@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
+import { onboardingInitiatorRoles } from "@openchip/shared";
 import { evaluateCompliance } from "@openchip/workflow";
 import {
   approveAllMandatoryAction,
@@ -49,7 +50,7 @@ export default async function CaseDetailsPage({
 }: {
   params: Promise<{ caseId: string }>;
 }) {
-  await requireSessionUser();
+  const sessionUser = await requireSessionUser();
 
   const [{ caseId }, tCase, tCommon, tSla] = await Promise.all([
     params,
@@ -100,6 +101,10 @@ export default async function CaseDetailsPage({
   const isSupplierSide = supplierSideStatuses.includes(onboardingCase.status as (typeof supplierSideStatuses)[number]);
   const canSendReminder = hasInvitation && isSupplierSide;
   const canCancelCase = onboardingCase.status !== "supplier_created_in_sap" && onboardingCase.status !== "cancelled";
+  const canEditSupplierInfo =
+    (onboardingInitiatorRoles as readonly string[]).includes(sessionUser.role) &&
+    onboardingCase.status !== "supplier_created_in_sap" &&
+    onboardingCase.status !== "cancelled";
 
   const countdownLabels = {
     notStarted: tSla("notStarted"),
@@ -182,7 +187,21 @@ export default async function CaseDetailsPage({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
             {tCommon("labels.case")} {onboardingCase.id}
           </p>
-          <h2 className="text-2xl font-semibold text-slate-900">{onboardingCase.supplierName}</h2>
+          <div className="mt-1 flex flex-wrap items-start gap-2">
+            <h2 className="text-2xl font-semibold text-slate-900">{onboardingCase.supplierName}</h2>
+            {canEditSupplierInfo ? (
+              <Link
+                href={`/cases/${onboardingCase.id}/edit`}
+                className="oc-btn oc-btn-secondary oc-btn-compact p-1.5"
+                aria-label={tCase("controls.editSupplierInfo")}
+                title={tCase("controls.editSupplierInfo")}
+              >
+                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <path d="m13.5 3.5 3 3L7 16H4v-3z" />
+                </svg>
+              </Link>
+            ) : null}
+          </div>
           <p className="mt-1 text-sm text-slate-600">
             VAT: {onboardingCase.supplierVat} · {tCommon("labels.category")}: {onboardingCase.categoryCode}
           </p>
@@ -241,7 +260,6 @@ export default async function CaseDetailsPage({
           ) : null}
         </div>
       </div>
-
       <WorkflowSwimlane status={onboardingCase.status} statusHistory={onboardingCase.statusHistory} />
 
       <div className="grid gap-5 xl:grid-cols-[2.2fr_1fr]">

@@ -8,16 +8,16 @@
     "companyTool": "Supplier Onboarding Portal",
     "nav": {
       "overview": "Overview",
-      "newCase": "New Case",
+      "newCase": "New Supplier",
       "users": "Users",
       "portalSettings": "Portal Settings"
     },
-    "createCase": "Create Case",
+    "createCase": "Create Supplier",
     "loginTitle": "Sign in",
     "guestInitials": "GU",
     "logout": "Log out",
     "page": {
-      "case": "Case",
+      "case": "Supplier",
       "supplierPortal": "Supplier Portal"
     },
     "language": {
@@ -47,7 +47,7 @@
     "invitationSla": "Invitation",
     "completionSla": "Completion",
     "labels": {
-      "case": "Case",
+      "case": "Supplier",
       "category": "Category"
     },
     "sourceChannel": {
@@ -77,27 +77,29 @@
     "overview": {
       "title": "Operations Overview",
       "subtitle": "Track onboarding throughput and bottlenecks",
-      "totalCases": "Total cases",
+      "totalCases": "Total suppliers",
       "pendingValidation": "Pending validation",
       "createdInSap": "Created in SAP"
     },
     "quickActions": {
       "title": "Quick actions",
       "subtitle": "Most-used commands",
-      "createCase": "Create case",
-      "helperText": "Case review and validation are available from each case workspace."
+      "createCase": "Create supplier",
+      "helperText": "Supplier review and validation are available from each supplier workspace."
     },
     "cases": {
-      "title": "Onboarding cases",
+      "title": "Onboarding suppliers",
       "subtitle": "Operational queue",
-      "empty": "No cases yet. Create a new onboarding case to begin.",
-      "emptyFiltered": "No cases match the selected filters.",
+      "empty": "No suppliers yet. Create a new onboarding supplier to begin.",
+      "emptyFiltered": "No suppliers match the selected filters.",
       "filters": {
         "all": "All",
         "sapPr": "SAP PR",
         "manual": "Manual",
         "statusLabel": "State",
         "allStatuses": "All states",
+        "searchLabel": "Search",
+        "searchPlaceholder": "Supplier name or VAT",
         "apply": "Apply"
       },
       "table": {
@@ -105,26 +107,33 @@
         "source": "Source",
         "status": "Status",
         "action": "Action",
-        "openCase": "Open case"
+        "openCase": "Open supplier"
       }
     }
   },
   "NewCase": {
     "goBack": "Go Back",
-    "title": "Create onboarding case",
+    "title": "Create onboarding supplier",
     "subtitle": "Internal initiation form",
     "supplierName": "Supplier Name",
     "supplierVat": "Supplier VAT / Tax ID",
     "supplierContactName": "Supplier Contact Name",
     "supplierContactEmail": "Supplier Contact Email",
     "requester": "Requester",
-    "createCase": "Create onboarding case",
-    "creatingCase": "Creating case...",
+    "createCase": "Create onboarding supplier",
+    "creatingCase": "Creating supplier...",
     "errors": {
       "validation": "Please review required fields. VAT / Tax ID must have at least 3 characters.",
-      "duplicateVat": "An onboarding case already exists for this VAT / Tax ID.",
-      "unknown": "The case could not be created. Please try again."
+      "duplicateVat": "An onboarding supplier already exists for this VAT / Tax ID.",
+      "unknown": "The supplier could not be created. Please try again."
     }
+  },
+  "EditCase": {
+    "goBack": "Go Back",
+    "title": "Edit supplier information",
+    "subtitle": "Update supplier details for this supplier",
+    "save": "Save changes",
+    "saving": "Saving changes..."
   },
   "VatInput": {
     "validate": "Validate VAT",
@@ -132,7 +141,7 @@
   },
   "CaseDetails": {
     "controls": {
-      "title": "Case controls",
+      "title": "Supplier controls",
       "subtitle": "Actions available for current status",
       "sendInvitation": "Send invitation",
       "sendingInvitation": "Sending invitation...",
@@ -146,16 +155,23 @@
       "resubmittingRejected": "Resubmitting documents...",
       "sendExpiryReminder": "Send expiration reminder",
       "sendingReminder": "Sending reminder...",
-      "cancelCase": "Cancel case",
+      "cancelCase": "Cancel Supplier Onboarding",
       "cancellationReason": "Cancellation reason",
       "defaultCancellationReason": "Cancelled by internal requester",
-      "cancellingCase": "Cancelling case...",
+      "cancellingCase": "Cancelling supplier...",
       "goBack": "Go back",
       "openSupplierPortal": "Open supplier portal",
       "copySupplierLink": "Supplier Link",
       "copyMagicLink": "Copy supplier magic link",
       "magicLinkCopied": "Copied",
-      "invitationNotGenerated": "Invitation not generated yet."
+      "invitationNotGenerated": "Invitation not generated yet.",
+      "editSupplierInfo": "Edit supplier information",
+      "supplierName": "Supplier Name",
+      "supplierVat": "Supplier VAT / Tax ID",
+      "supplierContactName": "Supplier Contact Name",
+      "supplierContactEmail": "Supplier Contact Email",
+      "saveSupplierInfo": "Save supplier info",
+      "savingSupplierInfo": "Saving supplier info..."
     },
     "requirements": {
       "title": "Document requirements",
@@ -192,7 +208,7 @@
       "title": "Status timeline"
     },
     "metadata": {
-      "title": "Case metadata",
+      "title": "Supplier metadata",
       "requester": "Requester",
       "supplierCategory": "Supplier category",
       "source": "Source",
@@ -225,12 +241,13 @@
   "StatusTimeline": {
     "actor": "User",
     "action": {
-      "expiration_reminder_sent": "Expiration reminder sent"
+      "expiration_reminder_sent": "Expiration reminder sent",
+      "supplier_info_updated": "Supplier information updated"
     }
   },
   "WorkflowSwimlane": {
     "title": "Workflow",
-    "cancelled": "Case is cancelled.",
+    "cancelled": "Supplier is cancelled.",
     "steps": {
       "onboarding_initiated": {
         "lane": "Internal",
@@ -301,6 +318,33 @@
       "addCategory": "Add category",
       "addingCategory": "Adding..."
     },
+    "documents": {
+      "title": "Document Catalog",
+      "subtitle": "Manage onboarding document definitions, labels, and templates",
+      "code": "Code",
+      "labelEn": "Label (EN)",
+      "labelEs": "Label (ES)",
+      "type": "Type",
+      "expiryPolicy": "Expiry policy",
+      "owner": "Owner",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "activate": "Activate",
+      "deactivate": "Deactivate",
+      "blocksPurchaseOrders": "Blocks purchase orders",
+      "yes": "Yes",
+      "no": "No",
+      "save": "Save",
+      "saving": "Saving...",
+      "uploadTemplate": "Upload template",
+      "uploadingTemplate": "Uploading...",
+      "downloadTemplate": "Download template",
+      "clearTemplate": "Clear template",
+      "noTemplate": "No template uploaded",
+      "addDocument": "Add document",
+      "addingDocument": "Adding..."
+    },
     "requirementMatrix": {
       "title": "Requirement Matrix",
       "subtitle": "Edit document requirements for each supplier category",
@@ -346,7 +390,11 @@
     "subtitle": "Complete your onboarding details",
     "supplier": "Supplier",
     "submitted": "Response submitted. Internal team will continue the process.",
-    "address": "Address",
+    "resumeNotice": "You can save your progress and resume onboarding at any time before final submission.",
+    "draftSavedNotice": "Draft saved.",
+    "street": "Street",
+    "city": "City",
+    "postalCode": "Postal code",
     "country": "Country",
     "countryPlaceholder": "Select a country",
     "bankSectionTitle": "Bank account details",
@@ -356,23 +404,48 @@
     "bankn": "Bank account number (BANKN)",
     "bkont": "Bank control key (BKONT)",
     "accname": "Bank account holder name",
-    "bkValidFrom": "Bank validity start",
-    "bkValidTo": "Bank validity end",
     "iban": "IBAN",
+    "saveDraft": "Save progress",
+    "savingDraft": "Saving progress...",
+    "draftSaved": "Progress saved",
+    "draftSaveError": "Could not save progress right now.",
     "submit": "Submit supplier response",
     "submitting": "Submitting...",
     "requiredDocsTitle": "Required documentation",
-    "requiredDocsSubtitle": "Upload one or more files per requirement",
+    "requiredDocsSubtitle": "Open a requirement, download template if available, and upload one or more files.",
+    "uploadFiles": "Upload files",
+    "uploadingFiles": "Uploading files...",
+    "templateDownload": "Download template",
+    "noTemplate": "No template available for this requirement.",
+    "uploadedFiles": "Uploaded files",
+    "noFiles": "No uploaded files yet.",
+    "otp": {
+      "title": "Verify access",
+      "subtitle": "Request a one-time code sent to {email} and enter it to continue.",
+      "requestCode": "Send verification code",
+      "requestingCode": "Sending code...",
+      "codeLabel": "Verification code",
+      "verify": "Verify code",
+      "verifying": "Verifying...",
+      "requested": "Verification code sent.",
+      "verified": "Access verified.",
+      "failed": "Unable to send verification code.",
+      "expired": "The verification code has expired. Request a new one.",
+      "attemptsExceeded": "Too many failed attempts. Request a new verification code.",
+      "notRequested": "Request a verification code first.",
+      "invalid": "Invalid verification code."
+    },
     "errors": {
       "validation": "Review your data and uploads. Mandatory requirements must include at least one file.",
       "missingMandatoryDocuments": "Missing files for one or more mandatory requirements.",
       "expired": "This supplier link has expired.",
-      "notFound": "This supplier case is no longer available."
+      "notFound": "This supplier is no longer available.",
+      "otpRequired": "Complete OTP verification to access the onboarding form."
     }
   },
   "NotFound": {
     "title": "Resource not found",
-    "description": "The supplier case or invitation link is invalid, expired, or no longer available.",
+    "description": "The supplier or invitation link is invalid, expired, or no longer available.",
     "back": "Back to dashboard"
   }
 }

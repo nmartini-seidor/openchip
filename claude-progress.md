@@ -1,31 +1,33 @@
 # Progress Log
 
 ## Current Objective
-Implement `supplier-onboarding-implementation-plan.md` as a typed monorepo with executable app flows, tests, and Docker Compose support.
+Close out the supplier onboarding rehaul with final verification artifacts and clean tracking state.
 
 ## Active Features
-- None (all current features completed)
+- None (all planned features completed)
 
-## Completed Work
-- Built monorepo structure with `apps/web` and `packages/{shared,workflow,db,integrations}`.
-- Implemented strict type-safe domain model, requirement matrix, state machine, compliance logic.
-- Implemented Next.js pages and Server Actions for end-to-end onboarding flow.
-- Added API contract routes for onboarding, supplier session, SAP and DocuWare mocks.
-- Added unit tests (workflow/db) and comprehensive Playwright e2e suite with always-on video capture and explicit screenshots.
-- Wired email delivery through SMTP/Mailpit-compatible adapter with test routes for outbox verification.
-- Added Dockerfile and docker-compose setup for web + postgres + mailpit and validated runtime startup.
-- Added a dedicated one-test Playwright demo walkthrough with slowed interactions to generate a single presentation-ready video.
-- Refined case detail UX: reordered controls into primary/support action groups and kept validation decision controls on a single row.
-- Refactored internationalization to `next-intl` with file-based catalogs (`apps/web/messages/en.json`, `apps/web/messages/es.json`) and removed hardcoded per-page locale `if` text branches.
-- Migrated translated UI to message-key access across layout, shell, login, dashboard, cases, users, portal settings, supplier portal, and shared status/SLA components.
-- Revalidated the app with `typecheck`, `lint`, full Playwright suite, and rebuilt/restarted Docker Compose containers.
-- Added SAP inbound PR integration endpoint with API-key auth and idempotency by `sapSystem + sapPrId`.
-- Extended case model with source metadata (`manual`/`sap_pr`, source system/reference, SAP requester) and surfaced source visibility in dashboard and case metadata.
-- Added OpenAPI/Swagger interface (`/api/openapi.json`, `/api/docs`) for SAP integration contract publication.
-- Added Playwright e2e coverage for SAP endpoint auth/idempotency/conflict behavior and queue visibility.
+## Latest Completed Work
+- Implemented DB-backed document definitions consumption in web flows (settings + requirement matrix).
+- Added document catalog administration UI (create/update/status) and template upload/download/clear paths.
+- Reworked supplier onboarding portal:
+  - OTP verification gate + supplier session cookie.
+  - Structured address fields (street/city/postal code/country).
+  - Simplified bank UI fields.
+  - Right-side accordion for requirement docs with per-doc uploads and template download.
+  - Draft save/resume support.
+- Added supplier draft/upload/template/file APIs and a Playwright test helper OTP endpoint (test mode only).
+- Updated localization keys (EN/ES) for new supplier/settings UX.
+
+## Verification Executed
+- `pnpm -r typecheck` ✅
+- `pnpm --filter @openchip/db test` ✅
+- `pnpm --filter @openchip/web test:e2e` ✅ (16 passed)
+- `docker compose up -d --build --force-recreate` ✅
+- `docker compose ps` ✅
+- `curl -I http://localhost:3000/login` ✅ (`HTTP/1.1 200 OK`)
 
 ## Blockers / Risks
-- None currently blocking delivery.
+- No active blockers found for the current scope.
 
 ## Exact Next Step
-- Commit and continue with next stakeholder-requested integration/UX extensions.
+Commit the complete implementation batch and proceed with user-driven next feature requests.

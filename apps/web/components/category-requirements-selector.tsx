@@ -113,7 +113,7 @@ export function CategoryRequirementsSelector({ categories, previewsByCategory }:
                 <tbody>
                   {mandatoryRows.map((row) => (
                     <tr key={`${selectedCategoryCode}-${row.code}-m`} className="border-b border-[var(--border)]/70 align-top">
-                      <td className="py-2 pr-3 text-slate-700">{row.name}</td>
+                      <td className="py-2 pr-3 text-slate-700">{row.labelEn}</td>
                       <td className="py-2 pr-3 font-semibold text-slate-900">{row.code}</td>
                       <td className="py-2 pr-3">
                         <span
@@ -150,7 +150,7 @@ export function CategoryRequirementsSelector({ categories, previewsByCategory }:
                 <tbody>
                   {optionalNaRows.map((row) => (
                     <tr key={`${selectedCategoryCode}-${row.code}-o`} className="border-b border-[var(--border)]/70 align-top">
-                      <td className="py-2 pr-3 text-slate-700">{row.name}</td>
+                      <td className="py-2 pr-3 text-slate-700">{row.labelEn}</td>
                       <td className="py-2 pr-3 font-semibold text-slate-900">{row.code}</td>
                       <td className="py-2 pr-3">
                         <span

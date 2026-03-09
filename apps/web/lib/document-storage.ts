@@ -4,6 +4,7 @@ import path from "node:path";
 import { DocumentCode, UploadedDocumentFile } from "@openchip/shared";
 
 const localUploadsRoot = path.join(process.cwd(), "output", "supplier-uploads");
+const localTemplatesRoot = path.join(process.cwd(), "output", "portal-templates");
 
 function sanitizeFileName(fileName: string): string {
   return fileName.replace(/[^\w.-]+/g, "_");
@@ -13,10 +14,14 @@ function toStoragePath(caseId: string, code: DocumentCode, storedName: string): 
   return path.posix.join("supplier-uploads", caseId, code, storedName);
 }
 
+function toTemplateStoragePath(code: DocumentCode, storedName: string): string {
+  return path.posix.join("portal-templates", code, storedName);
+}
+
 function toAbsoluteLocalPath(storagePath: string): string {
   const normalizedStoragePath = storagePath.replace(/^\/+/, "");
   const absolutePath = path.resolve(path.join(process.cwd(), "output", normalizedStoragePath));
-  const allowedRoot = path.resolve(path.join(process.cwd(), "output", "supplier-uploads"));
+  const allowedRoot = path.resolve(path.join(process.cwd(), "output"));
 
   if (!absolutePath.startsWith(allowedRoot)) {
     throw new Error("Invalid storage path.");
@@ -196,6 +201,68 @@ export async function saveSupplierDocument(input: SaveSupplierDocumentInput): Pr
   }
 
   return saveToLocalStorage(input);
+}
+
+interface SavePortalTemplateInput {
+  code: DocumentCode;
+  file: File;
+}
+
+async function saveTemplateToSupabase(input: SavePortalTemplateInput): Promise<string> {
+  const storageUrl = getStorageUrl();
+  if (storageUrl === null) {
+    throw new Error("SUPABASE_STORAGE_URL is not configured.");
+  }
+
+  await ensureSupabaseBucket();
+
+  const fileId = randomUUID();
+  const sanitizedName = sanitizeFileName(input.file.name);
+  const extension = path.extname(sanitizedName);
+  const baseName = path.basename(sanitizedName, extension).slice(0, 80);
+  const storedName = `${fileId}-${baseName}${extension}`;
+  const storagePath = toTemplateStoragePath(input.code, storedName);
+  const bytes = Buffer.from(await input.file.arrayBuffer());
+  const bucket = getStorageBucket();
+
+  const response = await fetch(`${storageUrl}/object/${encodeURIComponent(bucket)}/${encodeStoragePath(storagePath)}`, {
+    method: "POST",
+    headers: createSupabaseHeaders({
+      "content-type": input.file.type.length > 0 ? input.file.type : "application/octet-stream"
+    }),
+    body: bytes,
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Supabase template upload failed with status ${response.status}.`);
+  }
+
+  return storagePath;
+}
+
+async function saveTemplateToLocal(input: SavePortalTemplateInput): Promise<string> {
+  const fileId = randomUUID();
+  const sanitizedName = sanitizeFileName(input.file.name);
+  const extension = path.extname(sanitizedName);
+  const baseName = path.basename(sanitizedName, extension).slice(0, 80);
+  const storedName = `${fileId}-${baseName}${extension}`;
+  const storagePath = toTemplateStoragePath(input.code, storedName);
+  const absolutePath = path.join(localTemplatesRoot, input.code, storedName);
+
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  const bytes = Buffer.from(await input.file.arrayBuffer());
+  await writeFile(absolutePath, bytes);
+
+  return storagePath;
+}
+
+export async function saveDocumentTemplate(input: SavePortalTemplateInput): Promise<string> {
+  if (isSupabaseStorageEnabled()) {
+    return saveTemplateToSupabase(input);
+  }
+
+  return saveTemplateToLocal(input);
 }
 
 async function readFromSupabaseStorage(storagePath: string): Promise<Buffer> {

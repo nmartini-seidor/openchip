@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
-import { documentCodes, identifierSchema } from "@openchip/shared";
+import { documentCodeSchema, identifierSchema } from "@openchip/shared";
 import { getSessionUser } from "@/lib/auth";
 import { readStoredSupplierDocument } from "@/lib/document-storage";
 import { onboardingRepository } from "@/lib/repository";
-
-function isDocumentCode(value: string): value is (typeof documentCodes)[number] {
-  return (documentCodes as readonly string[]).includes(value);
-}
 
 function toAsciiFilename(value: string): string {
   return value.replace(/[^\x20-\x7E]+/g, "_").replace(/["\\]/g, "_");
@@ -23,7 +19,8 @@ export async function GET(
 
   const { caseId, code, fileId } = await context.params;
   const parsedCaseId = identifierSchema.safeParse(caseId);
-  if (!parsedCaseId.success || !isDocumentCode(code)) {
+  const parsedCode = documentCodeSchema.safeParse(code);
+  if (!parsedCaseId.success || !parsedCode.success) {
     return NextResponse.json({ message: "Invalid request" }, { status: 400 });
   }
 
@@ -32,7 +29,7 @@ export async function GET(
     return NextResponse.json({ message: "Case not found" }, { status: 404 });
   }
 
-  const requirement = onboardingCase.documents.find((document) => document.code === code);
+  const requirement = onboardingCase.documents.find((document) => document.code === parsedCode.data);
   if (requirement === undefined) {
     return NextResponse.json({ message: "Requirement not found" }, { status: 404 });
   }

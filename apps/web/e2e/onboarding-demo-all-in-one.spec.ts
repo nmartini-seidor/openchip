@@ -42,7 +42,7 @@ test("all demos in one normal-speed walkthrough video", async ({ page, request }
   const happyPathSupplierUrl = await sendInvitationFromCase(page);
   await assertEmailContains(request, happyPathEmail, "onboarding invitation", "/supplier/");
   await demoPause(page);
-  await submitSupplierResponse(page, happyPathSupplierUrl, happyCaseId);
+  await submitSupplierResponse(page, happyPathSupplierUrl, happyCaseId, happyPathEmail);
   await demoPause(page);
   await approveAllMandatory(page);
   await demoPause(page);
@@ -65,7 +65,7 @@ test("all demos in one normal-speed walkthrough video", async ({ page, request }
 
   await demoPause(page);
   const validationSupplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, validationSupplierUrl, validationCaseId);
+  await submitSupplierResponse(page, validationSupplierUrl, validationCaseId, "demo-validation@example.com");
   await demoPause(page);
 
   const finRow = page.locator("tr").filter({ has: page.getByText(/^FIN-01$/) }).first();
@@ -126,7 +126,7 @@ test("all demos in one normal-speed walkthrough video", async ({ page, request }
   await reminderButton.click();
   await assertEmailContains(request, complianceEmail, "document expiry reminder", "mandatory supplier documents");
   await demoPause(page);
-  await submitSupplierResponse(page, complianceSupplierUrl, complianceCaseId);
+  await submitSupplierResponse(page, complianceSupplierUrl, complianceCaseId, complianceEmail);
   await approveAllMandatory(page);
 
   const setExpiryResponse = await request.post(`/api/test/cases/${complianceCaseId}/set-document-expiry`, {

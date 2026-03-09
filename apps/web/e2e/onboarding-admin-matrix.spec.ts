@@ -62,12 +62,12 @@ test("admin can manage matrix configuration and it drives onboarding requirement
   await expect(previewFin03Row).toContainText("N/A");
   await captureCheckpoint(page, testInfo, "admin-03-preview-checked");
 
-  await page.getByRole("button", { name: "Create onboarding case" }).click();
+  await page.getByRole("button", { name: /Create onboarding (case|supplier)|Crear proveedor de onboarding/i }).click();
   await expect(page).toHaveURL(/\/cases\/[0-9a-fA-F-]{36}$/);
   const caseId = extractCaseIdFromUrl(page.url());
 
   const supplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, supplierUrl, caseId);
+  await submitSupplierResponse(page, supplierUrl, caseId, supplierEmail);
 
   const caseDocumentRows = page.locator("tbody tr");
   await expect(caseDocumentRows.filter({ has: page.getByText(/^FIN-03$/) })).toHaveCount(0);

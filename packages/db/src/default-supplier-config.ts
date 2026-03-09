@@ -38,7 +38,7 @@ interface SubsidizedColumns {
   subcontractorNational: RequirementLevel;
 }
 
-const nonSubsidizedMatrix: Record<DocumentCode, NonSubsidizedColumns> = {
+const nonSubsidizedMatrix: Record<string, NonSubsidizedColumns> = {
   "FIN-01": {
     standardInternational: "mandatory",
     standardNational: "mandatory",
@@ -132,7 +132,7 @@ const nonSubsidizedMatrix: Record<DocumentCode, NonSubsidizedColumns> = {
   }
 };
 
-const subsidizedMatrix: Record<DocumentCode, SubsidizedColumns> = {
+const subsidizedMatrix: Record<string, SubsidizedColumns> = {
   "FIN-01": {
     standardInternational: "mandatory",
     subcontractorInternational: "mandatory",
@@ -223,6 +223,9 @@ interface RequirementLookupInput {
 export function getDefaultRequirementLevel(input: RequirementLookupInput): RequirementLevel {
   if (input.funding === "subsidized") {
     const values = subsidizedMatrix[input.documentCode];
+    if (values === undefined) {
+      return "not_applicable";
+    }
     if (input.location === "international" && input.typeKey === "subcontractor") {
       return values.subcontractorInternational;
     }
@@ -239,6 +242,9 @@ export function getDefaultRequirementLevel(input: RequirementLookupInput): Requi
   }
 
   const values = nonSubsidizedMatrix[input.documentCode];
+  if (values === undefined) {
+    return "not_applicable";
+  }
 
   if (input.typeKey === "ecommerce") {
     return values.ecommerce;

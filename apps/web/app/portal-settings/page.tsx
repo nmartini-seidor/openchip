@@ -1,11 +1,16 @@
 import { getTranslations } from "next-intl/server";
-import { documentCatalog, fundingTypes, locationTypes } from "@openchip/shared";
+import { fundingTypes, locationTypes } from "@openchip/shared";
 import {
+  clearDocumentTemplateAction,
+  createDocumentDefinitionAction,
   createSupplierCategoryAction,
   createSupplierTypeAction,
+  setDocumentDefinitionStatusAction,
   setSupplierCategoryStatusAction,
   setSupplierTypeStatusAction,
+  updateDocumentDefinitionAction,
   updatePortalSettingsAction,
+  uploadDocumentTemplateAction,
   updateRequirementMatrixAction
 } from "@/app/actions";
 import { SectionCard } from "@/components/section-card";
@@ -22,6 +27,10 @@ function formatEnumLabel(value: string): string {
     .join(" ");
 }
 
+const documentTypeValues = ["internal", "external", "internal_or_external"] as const;
+const documentExpiryPolicyValues = ["no_expiry", "annual", "monthly"] as const;
+const documentOwnerValues = ["finance", "contracts_justifications", "compliance", "sustainability"] as const;
+
 export default async function PortalSettingsPage({
   searchParams
 }: {
@@ -29,11 +38,12 @@ export default async function PortalSettingsPage({
 }) {
   await requireSessionRole(["admin"]);
 
-  const [{ category: selectedCategoryParam }, settings, types, categories, tPortal, tCommon] = await Promise.all([
+  const [{ category: selectedCategoryParam }, settings, types, categories, documents, tPortal, tCommon] = await Promise.all([
     searchParams,
     onboardingRepository.getPortalSettings(),
     onboardingRepository.listSupplierTypes(true),
     onboardingRepository.listSupplierCategories(true),
+    onboardingRepository.listDocumentDefinitions(true),
     getTranslations("PortalSettings"),
     getTranslations("Common")
   ]);
@@ -253,6 +263,214 @@ export default async function PortalSettingsPage({
         </div>
       </SectionCard>
 
+      <SectionCard title={tPortal("documents.title")} subtitle={tPortal("documents.subtitle")}>
+        <div className="space-y-3">
+          {documents.map((document) => (
+            <div key={document.code} className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+              <form action={updateDocumentDefinitionAction} className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <input type="hidden" name="code" value={document.code} />
+
+                <div className="grid gap-1">
+                  <label htmlFor={`labelEn-${document.code}`} className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {tPortal("documents.labelEn")}
+                  </label>
+                  <input id={`labelEn-${document.code}`} name="labelEn" defaultValue={document.labelEn} className="oc-input" />
+                </div>
+
+                <div className="grid gap-1">
+                  <label htmlFor={`labelEs-${document.code}`} className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {tPortal("documents.labelEs")}
+                  </label>
+                  <input id={`labelEs-${document.code}`} name="labelEs" defaultValue={document.labelEs} className="oc-input" />
+                </div>
+
+                <div className="grid gap-1">
+                  <label htmlFor={`type-${document.code}`} className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {tPortal("documents.type")}
+                  </label>
+                  <select id={`type-${document.code}`} name="type" defaultValue={document.type} className="oc-input oc-select">
+                    {documentTypeValues.map((value) => (
+                      <option key={value} value={value}>
+                        {formatEnumLabel(value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-1">
+                  <label htmlFor={`expiry-${document.code}`} className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {tPortal("documents.expiryPolicy")}
+                  </label>
+                  <select id={`expiry-${document.code}`} name="expiryPolicy" defaultValue={document.expiryPolicy} className="oc-input oc-select">
+                    {documentExpiryPolicyValues.map((value) => (
+                      <option key={value} value={value}>
+                        {formatEnumLabel(value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-1">
+                  <label htmlFor={`owner-${document.code}`} className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {tPortal("documents.owner")}
+                  </label>
+                  <select id={`owner-${document.code}`} name="owner" defaultValue={document.owner} className="oc-input oc-select">
+                    {documentOwnerValues.map((value) => (
+                      <option key={value} value={value}>
+                        {formatEnumLabel(value)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid gap-1">
+                  <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">{tPortal("documents.code")}</label>
+                  <input value={document.code} readOnly className="oc-input bg-[var(--surface)] text-slate-600" />
+                </div>
+
+                <div className="grid gap-1">
+                  <label className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">{tPortal("documents.status")}</label>
+                  <p className="text-sm text-slate-700">
+                    {document.active ? tPortal("documents.active") : tPortal("documents.inactive")}
+                  </p>
+                </div>
+
+                <div className="grid gap-2">
+                  <label htmlFor={`blocks-${document.code}`} className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    {tPortal("documents.blocksPurchaseOrders")}
+                  </label>
+                  <select id={`blocks-${document.code}`} name="blocksPurchaseOrders" defaultValue={document.blocksPurchaseOrders ? "true" : "false"} className="oc-input oc-select">
+                    <option value="true">{tPortal("documents.yes")}</option>
+                    <option value="false">{tPortal("documents.no")}</option>
+                  </select>
+                </div>
+
+                <div className="flex items-end justify-end">
+                  <SubmitButton
+                    label={tPortal("documents.save")}
+                    pendingLabel={tPortal("documents.saving")}
+                    className="oc-btn oc-btn-secondary"
+                  />
+                </div>
+              </form>
+
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <form action={setDocumentDefinitionStatusAction}>
+                  <input type="hidden" name="code" value={document.code} />
+                  <input type="hidden" name="active" value={document.active ? "false" : "true"} />
+                  <SubmitButton
+                    label={document.active ? tPortal("documents.deactivate") : tPortal("documents.activate")}
+                    pendingLabel={tPortal("documents.saving")}
+                    className="oc-btn oc-btn-secondary oc-btn-compact"
+                  />
+                </form>
+
+                <form action={uploadDocumentTemplateAction} className="flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="code" value={document.code} />
+                  <input type="file" name="templateFile" required className="oc-input max-w-xs text-sm" />
+                  <SubmitButton
+                    label={tPortal("documents.uploadTemplate")}
+                    pendingLabel={tPortal("documents.uploadingTemplate")}
+                    className="oc-btn oc-btn-secondary oc-btn-compact"
+                  />
+                </form>
+
+                {document.templateStoragePath !== null ? (
+                  <>
+                    <a href={`/api/document-definitions/${document.code}/template`} className="oc-btn oc-btn-secondary oc-btn-compact">
+                      {tPortal("documents.downloadTemplate")}
+                    </a>
+                    <form action={clearDocumentTemplateAction}>
+                      <input type="hidden" name="code" value={document.code} />
+                      <SubmitButton
+                        label={tPortal("documents.clearTemplate")}
+                        pendingLabel={tPortal("documents.saving")}
+                        className="oc-btn oc-btn-danger oc-btn-compact"
+                      />
+                    </form>
+                  </>
+                ) : (
+                  <p className="text-xs text-slate-500">{tPortal("documents.noTemplate")}</p>
+                )}
+              </div>
+            </div>
+          ))}
+
+          <form action={createDocumentDefinitionAction} className="grid gap-3 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-1">
+              <label htmlFor="newDocumentCode" className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {tPortal("documents.code")}
+              </label>
+              <input id="newDocumentCode" name="code" placeholder="FIN-99" required className="oc-input" />
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="newDocumentLabelEn" className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {tPortal("documents.labelEn")}
+              </label>
+              <input id="newDocumentLabelEn" name="labelEn" required className="oc-input" />
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="newDocumentLabelEs" className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {tPortal("documents.labelEs")}
+              </label>
+              <input id="newDocumentLabelEs" name="labelEs" required className="oc-input" />
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="newDocumentType" className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {tPortal("documents.type")}
+              </label>
+              <select id="newDocumentType" name="type" defaultValue={documentTypeValues[0]} className="oc-input oc-select">
+                {documentTypeValues.map((value) => (
+                  <option key={value} value={value}>
+                    {formatEnumLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="newDocumentExpiry" className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {tPortal("documents.expiryPolicy")}
+              </label>
+              <select id="newDocumentExpiry" name="expiryPolicy" defaultValue={documentExpiryPolicyValues[0]} className="oc-input oc-select">
+                {documentExpiryPolicyValues.map((value) => (
+                  <option key={value} value={value}>
+                    {formatEnumLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="newDocumentOwner" className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {tPortal("documents.owner")}
+              </label>
+              <select id="newDocumentOwner" name="owner" defaultValue={documentOwnerValues[0]} className="oc-input oc-select">
+                {documentOwnerValues.map((value) => (
+                  <option key={value} value={value}>
+                    {formatEnumLabel(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid gap-1">
+              <label htmlFor="newDocumentBlocks" className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                {tPortal("documents.blocksPurchaseOrders")}
+              </label>
+              <select id="newDocumentBlocks" name="blocksPurchaseOrders" defaultValue="true" className="oc-input oc-select">
+                <option value="true">{tPortal("documents.yes")}</option>
+                <option value="false">{tPortal("documents.no")}</option>
+              </select>
+            </div>
+            <div className="flex items-end justify-end">
+              <SubmitButton
+                label={tPortal("documents.addDocument")}
+                pendingLabel={tPortal("documents.addingDocument")}
+                className="oc-btn oc-btn-primary"
+              />
+            </div>
+          </form>
+        </div>
+      </SectionCard>
+
       <SectionCard title={tPortal("requirementMatrix.title")} subtitle={tPortal("requirementMatrix.subtitle")}>
         {categories.length === 0 ? (
           <p className="text-sm text-slate-600">{tPortal("requirementMatrix.empty")}</p>
@@ -302,13 +520,13 @@ export default async function PortalSettingsPage({
                       </tr>
                     </thead>
                     <tbody>
-                      {documentCatalog.map((document) => {
+                      {documents.map((document) => {
                         const matrixEntry = matrixByDocumentCode.get(document.code);
                         const currentLevel = matrixEntry?.requirementLevel ?? "not_applicable";
 
                         return (
                           <tr key={document.code} className="border-b border-[var(--border)]/70 align-top">
-                            <td className="py-2 pr-3 text-slate-700">{document.name}</td>
+                            <td className="py-2 pr-3 text-slate-700">{document.labelEn} / {document.labelEs}</td>
                             <td className="py-2 pr-3 font-semibold text-slate-900">{document.code}</td>
                             <td className="py-2 pr-3 text-slate-700">{requirementLevelLabels[currentLevel]}</td>
                             <td className="py-2 pr-3">

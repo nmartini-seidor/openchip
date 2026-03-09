@@ -1,21 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { IBM_Plex_Sans, Public_Sans } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages, getTranslations } from "next-intl/server";
 import { Toaster } from "sonner";
 import { DashboardShell } from "@/components/dashboard-shell";
 import { getSessionUser } from "@/lib/auth";
 import "./globals.css";
-
-const headingFont = IBM_Plex_Sans({
-  subsets: ["latin"],
-  variable: "--font-heading"
-});
-
-const bodyFont = Public_Sans({
-  subsets: ["latin"],
-  variable: "--font-body"
-});
 
 export const metadata: Metadata = {
   title: "Openchip Supplier Onboarding",
@@ -36,7 +25,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
 
   return (
     <html lang={locale}>
-      <body className={`${headingFont.variable} ${bodyFont.variable}`}>
+      <body className="antialiased">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <a
             href="#main-content"

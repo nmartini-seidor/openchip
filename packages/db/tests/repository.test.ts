@@ -50,4 +50,68 @@ describe("onboarding repository", () => {
     expect(found?.sourceChannel).toBe("sap_pr");
     expect(found?.requestedBySapUser).toBe("U123456");
   });
+
+  it("updates supplier information and records audit action", async () => {
+    const repository = getOnboardingRepository();
+
+    const created = await repository.createCase({
+      supplierName: "Proveedor Editable",
+      supplierVat: `EDIT-${crypto.randomUUID()}`,
+      supplierContactName: "Edit User",
+      supplierContactEmail: "edit@example.com",
+      requester: "Finance Team",
+      categoryCode: "SUB-STD-NAT"
+    });
+
+    const updated = await repository.updateSupplierInfo(
+      {
+        caseId: created.id,
+        supplierName: "Proveedor Editable Updated",
+        supplierVat: created.supplierVat,
+        supplierContactName: "Edit User Updated",
+        supplierContactEmail: "edit-updated@example.com"
+      },
+      "Finance User <finance@openchip.local>"
+    );
+
+    expect(updated.supplierName).toBe("Proveedor Editable Updated");
+    expect(updated.supplierContactName).toBe("Edit User Updated");
+    expect(updated.supplierContactEmail).toBe("edit-updated@example.com");
+    expect(updated.actionHistory.at(-1)?.actionType).toBe("supplier_info_updated");
+  });
+
+  it("rejects supplier info update when VAT duplicates another active case", async () => {
+    const repository = getOnboardingRepository();
+
+    const first = await repository.createCase({
+      supplierName: "Proveedor First",
+      supplierVat: `VATA-${crypto.randomUUID()}`,
+      supplierContactName: "First User",
+      supplierContactEmail: "first@example.com",
+      requester: "Finance Team",
+      categoryCode: "SUB-STD-NAT"
+    });
+
+    const second = await repository.createCase({
+      supplierName: "Proveedor Second",
+      supplierVat: `VATB-${crypto.randomUUID()}`,
+      supplierContactName: "Second User",
+      supplierContactEmail: "second@example.com",
+      requester: "Finance Team",
+      categoryCode: "SUB-STD-NAT"
+    });
+
+    await expect(
+      repository.updateSupplierInfo(
+        {
+          caseId: second.id,
+          supplierName: second.supplierName,
+          supplierVat: first.supplierVat,
+          supplierContactName: second.supplierContactName,
+          supplierContactEmail: second.supplierContactEmail
+        },
+        "Finance User <finance@openchip.local>"
+      )
+    ).rejects.toThrow(/same VAT/i);
+  });
 });

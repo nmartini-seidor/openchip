@@ -4,6 +4,7 @@ import {
   createCaseViaUi,
   createUniqueVat,
   extractCaseIdFromUrl,
+  loginAs,
   loginAsFinance,
   resetTestState,
   sendInvitationFromCase,
@@ -20,7 +21,7 @@ test("invalid case payload is handled with inline validation feedback", async ({
   await page.getByLabel("Supplier Contact Name").fill("Validation User");
   await page.getByLabel("Supplier Contact Email").fill("validation@example.com");
   await page.getByLabel("Supplier Category").selectOption("SUB-STD-NAT");
-  await page.getByRole("button", { name: "Create onboarding case" }).click();
+  await page.getByRole("button", { name: /Create onboarding (case|supplier)|Crear proveedor de onboarding/i }).click();
 
   await expect(page).toHaveURL(/\/cases\/new\?error=validation$/);
   await expect(page.getByText("VAT / Tax ID must have at least 3 characters.")).toBeVisible();
@@ -44,7 +45,7 @@ test("complete-validation and sap-create guardrails block invalid transitions", 
 
   const caseId = extractCaseIdFromUrl(page.url());
   const supplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, supplierUrl, caseId);
+  await submitSupplierResponse(page, supplierUrl, caseId, "guard@example.com");
 
   const validationResponse = await request.post(`/api/onboarding/cases/${caseId}/complete-validation`);
   expect(validationResponse.ok()).toBeFalsy();
@@ -85,9 +86,41 @@ test("duplicate VAT is rejected and cancellation sets cancelled status", async (
   });
 
   await sendInvitationFromCase(page);
-  await page.locator("summary").filter({ hasText: "Cancel case" }).click();
-  await page.getByRole("button", { name: "Cancel case" }).click();
+  await page.locator("summary").filter({ hasText: /Cancel/i }).click();
+  await page.getByRole("button", { name: /Cancel/i }).first().click();
   await expect(page.locator("span").filter({ hasText: /^Cancelled$/ }).first()).toBeVisible();
 
   await captureCheckpoint(page, testInfo, "duplicate-vat-and-cancelled");
+});
+
+test("initiators can edit supplier info from open case and non-initiators cannot", async ({ page, request }, testInfo) => {
+  await resetTestState(request);
+  await loginAsFinance(page);
+
+  const caseId = await createCaseViaUi(page, {
+    supplierName: "Proveedor Edit Flow",
+    supplierVat: createUniqueVat("EDIT"),
+    supplierContactName: "Edit Contact",
+    supplierContactEmail: "edit-flow@example.com",
+    requester: "Finance Team",
+    categoryCode: "SUB-STD-NAT"
+  });
+
+  await page.getByLabel(/Edit supplier information|Editar información del proveedor/).click();
+  await expect(page).toHaveURL(new RegExp(`/cases/${caseId}/edit$`));
+  await page.getByLabel("Supplier Name").fill("Proveedor Edit Flow Updated");
+  await page.getByLabel("Supplier VAT / Tax ID").fill(createUniqueVat("EDITUPD"));
+  await page.getByLabel("Supplier Contact Name").fill("Edit Contact Updated");
+  await page.getByLabel("Supplier Contact Email").fill("edit-flow-updated@example.com");
+  await page.getByRole("button", { name: /Save changes|Guardar cambios/ }).click();
+
+  await expect(page.getByRole("heading", { name: "Proveedor Edit Flow Updated" })).toBeVisible();
+  await expect(page.locator("span").filter({ hasText: /^Supplier information updated$/ }).first()).toBeVisible();
+  await captureCheckpoint(page, testInfo, "supplier-info-edited");
+
+  await page.context().clearCookies();
+  await loginAs(page, "compliance@openchip.local");
+  await page.goto(`/cases/${caseId}`);
+  await expect(page.getByLabel(/Edit supplier information|Editar información del proveedor/)).toHaveCount(0);
+  await captureCheckpoint(page, testInfo, "supplier-info-hidden-for-non-initiator");
 });

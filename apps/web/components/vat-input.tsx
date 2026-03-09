@@ -7,6 +7,7 @@ interface VatInputProps {
   label: string;
   inputId: string;
   inputName: string;
+  defaultValue?: string;
 }
 
 function looksLikeVat(value: string): boolean {
@@ -19,9 +20,9 @@ function looksLikeVat(value: string): boolean {
   return /^[A-Z0-9-]+$/.test(candidate) && /[A-Z]/.test(candidate) && /[0-9]/.test(candidate);
 }
 
-export function VatInput({ label, inputId, inputName }: VatInputProps) {
+export function VatInput({ label, inputId, inputName, defaultValue = "" }: VatInputProps) {
   const t = useTranslations("VatInput");
-  const [value, setValue] = useState("");
+  const [value, setValue] = useState(defaultValue);
   const [validatedValue, setValidatedValue] = useState<string | null>(null);
 
   const isValidPattern = useMemo(() => looksLikeVat(value), [value]);

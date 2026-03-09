@@ -1,109 +1,173 @@
 {
-  "version": 1,
-  "last_updated": "2026-03-06T14:10:00Z",
+  "version": 2,
+  "last_updated": "2026-03-09T17:43:00Z",
   "features": [
     {
-      "id": "F-001",
-      "title": "Monorepo bootstrap with Next.js + Tailwind",
+      "id": "F-101",
+      "title": "Harness refresh and execution tracking",
       "status": "completed",
       "dependencies": [],
       "acceptance_criteria": [
-        "Workspace has apps/* and packages/*",
-        "Root scripts support dev/build/test/typecheck",
-        "App uses Next.js App Router and Tailwind"
+        "Feature backlog reflects the full supplier onboarding rehaul scope",
+        "claude-progress.md tracks active feature ids, blockers, and exact next step",
+        "Each completed feature records concrete verification steps and outcomes"
       ],
       "verification_steps": [
-        "pnpm typecheck",
-        "pnpm test"
+        "Manual artifact validation"
       ],
-      "notes": "Implemented with Turborepo and strict TypeScript settings."
+      "notes": "Backlog refreshed and maintained during implementation."
     },
     {
-      "id": "F-002",
-      "title": "Typed domain packages and workflow engine",
+      "id": "F-102",
+      "title": "Configurable document catalog (DB-backed) with EN/ES labels and templates metadata",
       "status": "completed",
-      "dependencies": ["F-001"],
+      "dependencies": [
+        "F-101"
+      ],
       "acceptance_criteria": [
-        "Shared types cover statuses/categories/docs/validation",
-        "Requirement resolver and state machine implemented",
-        "Compliance evaluator implemented"
+        "Document definitions are stored and managed from supplier config store (in-memory + Postgres)",
+        "Seed includes docx-based defaults (including FIN-01 and TAX-02) with EN/ES labels",
+        "Requirement preview rows resolve from config store instead of static-only catalog"
       ],
       "verification_steps": [
-        "pnpm typecheck",
-        "pnpm test"
+        "pnpm --filter @openchip/db test",
+        "pnpm --filter @openchip/web typecheck"
       ],
-      "notes": "No `any` usage introduced."
+      "notes": "Shared/domain+schema and supplier config store now support DB-backed document definitions with EN/ES labels and template path metadata."
     },
     {
-      "id": "F-003",
-      "title": "Onboarding UI flows with server actions",
+      "id": "F-103",
+      "title": "Portal Settings document catalog management and template upload",
       "status": "completed",
-      "dependencies": ["F-001", "F-002"],
+      "dependencies": [
+        "F-102"
+      ],
       "acceptance_criteria": [
-        "Dashboard, case creation, case detail, supplier portal pages work",
-        "Status transitions and validation actions are functional",
-        "Mock SAP and DocuWare integrations wired"
+        "Portal Settings exposes CRUD-style controls for document definitions",
+        "Admin can upload/remove one template file per document",
+        "Requirement matrix UI uses configured document labels and no static duplication"
       ],
       "verification_steps": [
-        "pnpm typecheck",
-        "pnpm test:e2e"
+        "pnpm --filter @openchip/web typecheck",
+        "Playwright admin settings scenario"
       ],
-      "notes": "Server Actions used for mutations per Next.js best practices."
+      "notes": "Portal Settings includes document definition create/update/status and template upload/download/clear controls."
     },
     {
-      "id": "F-004",
-      "title": "API contract routes",
+      "id": "F-104",
+      "title": "Supplier form address and bank details rehaul",
       "status": "completed",
-      "dependencies": ["F-002", "F-003"],
+      "dependencies": [
+        "F-102"
+      ],
       "acceptance_criteria": [
-        "Core onboarding/supplier/session routes available",
-        "Mock SAP and DocuWare adapter routes available"
+        "Supplier address input is split into street/city/postal code/country",
+        "Bank UI hides SAP-only validity fields and keeps IBAN/account-number behavior",
+        "Underlying DB model remains compatible and retains SAP fields"
       ],
       "verification_steps": [
-        "pnpm typecheck",
-        "pnpm test"
+        "pnpm --filter @openchip/web typecheck",
+        "pnpm --filter @openchip/db test"
       ],
-      "notes": "Route handlers implemented in app/api with schema validation."
+      "notes": "Supplier onboarding captures street/city/postal code/country and simplified bank fields while retaining SAP compatibility in model."
     },
     {
-      "id": "F-005",
-      "title": "Validation, E2E testing and Docker Compose runtime",
+      "id": "F-105",
+      "title": "Supplier documentation UX on right-side accordion with template download",
       "status": "completed",
-      "dependencies": ["F-001", "F-003", "F-004"],
+      "dependencies": [
+        "F-102",
+        "F-103",
+        "F-104"
+      ],
       "acceptance_criteria": [
-        "Automated Playwright e2e suite passes with recorded videos/screenshots",
-        "Mailpit-based email path is wired and testable",
-        "Docker Compose services build and run successfully"
+        "Bottom required documentation block is removed",
+        "Right panel has single-open accordion per required document",
+        "Each accordion entry allows template download and document upload"
       ],
       "verification_steps": [
-        "pnpm test:e2e",
-        "docker compose config",
-        "docker compose up -d --build",
-        "docker compose ps"
+        "pnpm --filter @openchip/web typecheck",
+        "Playwright supplier upload scenario"
       ],
-      "notes": "Validated with green Playwright run (9/9), artifact generation, and running web+postgres+mailpit containers."
+      "notes": "Supplier portal now uses a right-side single-open documentation accordion with per-requirement template download and upload."
     },
     {
-      "id": "F-006",
-      "title": "SAP PR inbound integration + OpenAPI/Swagger contract",
+      "id": "F-106",
+      "title": "Supplier resume via draft autosave",
       "status": "completed",
-      "dependencies": ["F-002", "F-004", "F-005"],
+      "dependencies": [
+        "F-104",
+        "F-105"
+      ],
       "acceptance_criteria": [
-        "Inbound SAP PR endpoint creates onboarding case with idempotency by SAP reference",
-        "Endpoint is protected by API key and validates payload schema",
-        "OpenAPI JSON and Swagger UI are exposed",
-        "Dashboard exposes SAP-originated queue visibility"
+        "Supplier progress is saved server-side before final submit",
+        "Reloading supplier link restores entered address/bank values and uploaded docs",
+        "Supplier portal shows resume-safe messaging"
       ],
       "verification_steps": [
-        "pnpm typecheck",
-        "pnpm lint",
-        "pnpm test",
-        "pnpm --filter @openchip/web test:e2e",
-        "pnpm --filter @openchip/web build",
+        "pnpm --filter @openchip/web typecheck",
+        "Playwright resume scenario"
+      ],
+      "notes": "Supplier draft save API and resumable form state implemented; uploaded docs are preserved server-side."
+    },
+    {
+      "id": "F-107",
+      "title": "Supplier token hardening with Magic Link + OTP",
+      "status": "completed",
+      "dependencies": [
+        "F-104"
+      ],
+      "acceptance_criteria": [
+        "Supplier link requires OTP verification before onboarding form access",
+        "OTP flow enforces expiration and attempt limits",
+        "Supplier session cookie gates upload/draft/submit operations"
+      ],
+      "verification_steps": [
+        "pnpm --filter @openchip/web typecheck",
+        "Playwright OTP scenario"
+      ],
+      "notes": "OTP request/verify flow implemented with supplier session cookie gate for supplier draft/upload/template/submit operations."
+    },
+    {
+      "id": "F-108",
+      "title": "Localization and regression coverage for new supplier/admin flows",
+      "status": "completed",
+      "dependencies": [
+        "F-103",
+        "F-104",
+        "F-105",
+        "F-106",
+        "F-107"
+      ],
+      "acceptance_criteria": [
+        "All new UI strings exist in EN and ES (except requirement matrix enum values that are intentionally left)",
+        "Automated tests cover catalog, OTP, resume, and supplier submission happy path",
+        "No regressions on existing dashboard/case workflows"
+      ],
+      "verification_steps": [
+        "pnpm --filter @openchip/web typecheck",
+        "pnpm --filter @openchip/web test:e2e"
+      ],
+      "notes": "EN/ES keys added for new flows and full Playwright e2e suite now passes (16 tests)."
+    },
+    {
+      "id": "F-109",
+      "title": "Container rebuild and final verification closure",
+      "status": "completed",
+      "dependencies": [
+        "F-108"
+      ],
+      "acceptance_criteria": [
+        "Containers are rebuilt and force recreated after repository changes",
+        "Portal is reachable and key flows smoke-tested",
+        "Tracking artifacts updated with final outcomes"
+      ],
+      "verification_steps": [
         "docker compose up -d --build --force-recreate",
-        "docker compose ps"
+        "docker compose ps",
+        "curl -f http://localhost:3000/login"
       ],
-      "notes": "Implemented `/api/integrations/sap/purchase-requests/new-supplier`, `/api/openapi.json`, `/api/docs`, source metadata in cases, and Playwright SAP integration coverage."
+      "notes": "Containers rebuilt/recreated; runtime services healthy; portal login endpoint reachable."
     }
   ]
 }

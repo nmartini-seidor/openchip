@@ -42,8 +42,8 @@ export async function loginAsAdmin(page: Page): Promise<void> {
 
 export async function loginAs(page: Page, email: string): Promise<void> {
   await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByLabel(/Email|Correo/).fill(email);
+  await page.getByRole("button", { name: /Sign in|Entrar/ }).click();
   await expect(page).toHaveURL("/");
 }
 
@@ -65,7 +65,9 @@ export async function createCaseViaUi(page: Page, input: NewCaseInput): Promise<
   await page.getByLabel("Supplier Contact Name").fill(input.supplierContactName);
   await page.getByLabel("Supplier Contact Email").fill(input.supplierContactEmail);
   await page.getByLabel("Supplier Category").selectOption(input.categoryCode);
-  await page.getByRole("button", { name: "Create onboarding case" }).click();
+  await page
+    .getByRole("button", { name: /Create onboarding (case|supplier)|Crear proveedor de onboarding/i })
+    .click();
 
   await expect(page).toHaveURL(/\/cases\/[0-9a-fA-F-]{36}$/);
   return extractCaseIdFromUrl(page.url());
@@ -94,9 +96,52 @@ export async function sendInvitationFromCase(page: Page): Promise<string> {
   return href;
 }
 
-export async function submitSupplierResponse(page: Page, supplierUrl: string, caseId: string): Promise<void> {
+async function fetchOtpCodeForSupplier(page: Page, supplierUrl: string): Promise<string> {
+  const token = supplierUrl.split("/").filter((segment) => segment.length > 0).at(-1);
+  if (token === undefined) {
+    throw new Error(`Cannot extract token from supplier url: ${supplierUrl}`);
+  }
+
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    const response = await page.request.get(`/api/test/supplier/${token}/otp`);
+    if (response.ok()) {
+      const payload = (await response.json()) as { code: string | null };
+      if (typeof payload.code === "string" && payload.code.length === 6) {
+        return payload.code;
+      }
+    }
+    await page.waitForTimeout(200);
+  }
+
+  throw new Error(`OTP code was not available for token=${token} within timeout.`);
+}
+
+export async function submitSupplierResponse(
+  page: Page,
+  supplierUrl: string,
+  caseId: string,
+  _supplierContactEmail: string
+): Promise<void> {
   await page.goto(supplierUrl);
-  await page.getByLabel(/Address|Dirección/).fill("Carrer de Mallorca 123");
+  await Promise.all([
+    page.waitForURL(/otp=(requested|failed)/),
+    page.getByRole("button", { name: /Send verification code|Enviar código de verificación/ }).click()
+  ]);
+  const otpCode = await fetchOtpCodeForSupplier(page, supplierUrl);
+  await page.getByLabel(/Verification code|Código de verificación/).fill(otpCode);
+  await Promise.all([
+    page.waitForURL(/otp=(verified|failed)|otpError=/),
+    page.getByRole("button", { name: /Verify code|Verificar código/ }).click()
+  ]);
+  if (page.url().includes("otpError=")) {
+    throw new Error(`Supplier OTP verification failed for ${supplierUrl}. Current URL: ${page.url()}`);
+  }
+  await expect(page.getByLabel(/Street|Calle/)).toBeVisible();
+
+  await page.getByLabel(/Street|Calle/).fill("Carrer de Mallorca 123");
+  await page.getByLabel(/City|Ciudad/).fill("Barcelona");
+  await page.getByLabel(/Postal code|Código postal/).fill("08013");
   await page.locator("#country").click();
   await page.locator("#country").fill("Spain");
   await page.keyboard.press("Enter");
@@ -108,20 +153,28 @@ export async function submitSupplierResponse(page: Page, supplierUrl: string, ca
   await page.getByLabel(/Bank key|Clave banco/).fill("2100");
   await page.getByLabel(/IBAN/).fill("ES9121000418450200051332");
   await page.getByLabel(/Bank account holder name|Titular de la cuenta bancaria/).fill("Proveedor Demo SL");
-  await page.getByLabel(/Bank validity start|Inicio de vigencia bancaria/).fill("2026-01-01");
-  await page.getByLabel(/Bank validity end|Fin de vigencia bancaria/).fill("2027-01-01");
 
-  const uploadInputs = page.locator('input[type="file"]');
-  const uploadCount = await uploadInputs.count();
-  for (let index = 0; index < uploadCount; index += 1) {
-    await uploadInputs.nth(index).setInputFiles([
+  const requirementSections = page.locator("aside section");
+  const requirementCount = await requirementSections.count();
+  for (let index = 0; index < requirementCount; index += 1) {
+    const section = requirementSections.nth(index);
+    let uploadInput = section.locator('input[type="file"]');
+    if ((await uploadInput.count()) === 0) {
+      await section.locator("button").first().click();
+      uploadInput = section.locator('input[type="file"]');
+    }
+    await expect(uploadInput).toBeVisible();
+    const fileName = `requirement-${index + 1}.pdf`;
+    await uploadInput.setInputFiles([
       {
-        name: `requirement-${index + 1}.pdf`,
+        name: fileName,
         mimeType: "application/pdf",
         buffer: Buffer.from("%PDF-1.4 demo")
       }
     ]);
+    await expect(section.getByRole("link", { name: fileName })).toBeVisible();
   }
+
   await page.getByRole("button", { name: /Submit supplier response|Enviar respuesta/ }).click();
 
   await expect(page).toHaveURL(new RegExp(`/supplier/.+\?submitted=1$`));

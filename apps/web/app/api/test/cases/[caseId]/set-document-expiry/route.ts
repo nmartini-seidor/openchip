@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
-import { documentCodes, identifierSchema } from "@openchip/shared";
+import { documentCodeSchema, identifierSchema } from "@openchip/shared";
 import { onboardingRepository } from "@/lib/repository";
 import { ensurePlaywrightTestMode } from "@/lib/test-mode";
 
 interface SetDocumentExpiryRequest {
   code: string;
   validTo: string | null;
-}
-
-function isDocumentCode(value: string): value is (typeof documentCodes)[number] {
-  return (documentCodes as readonly string[]).includes(value);
 }
 
 export async function POST(request: Request, context: { params: Promise<{ caseId: string }> }): Promise<NextResponse> {
@@ -22,7 +18,8 @@ export async function POST(request: Request, context: { params: Promise<{ caseId
   const parsedCaseId = identifierSchema.parse(caseId);
   const payload = (await request.json()) as SetDocumentExpiryRequest;
 
-  if (!isDocumentCode(payload.code)) {
+  const parsedCode = documentCodeSchema.safeParse(payload.code);
+  if (!parsedCode.success) {
     return NextResponse.json({ message: "Invalid document code" }, { status: 400 });
   }
 
@@ -30,6 +27,6 @@ export async function POST(request: Request, context: { params: Promise<{ caseId
     return NextResponse.json({ message: "Invalid validTo value" }, { status: 400 });
   }
 
-  const updatedCase = await onboardingRepository.setDocumentExpiry(parsedCaseId, payload.code, payload.validTo);
+  const updatedCase = await onboardingRepository.setDocumentExpiry(parsedCaseId, parsedCode.data, payload.validTo);
   return NextResponse.json(updatedCase);
 }

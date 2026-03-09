@@ -1,7 +1,6 @@
 import { z } from "zod";
 import {
   caseSourceChannels,
-  documentCodes,
   fundingTypes,
   internalRoles,
   locationTypes,
@@ -17,7 +16,12 @@ const supplierCategoryCodeSchema = z
   .max(48)
   .regex(/^[A-Z0-9-]+$/, "Category code must use uppercase letters, numbers, and hyphen.");
 
-const documentCodeSchema = z.enum(documentCodes);
+export const documentCodeSchema = z
+  .string()
+  .trim()
+  .min(3)
+  .max(24)
+  .regex(/^[A-Z0-9]+-[A-Z0-9]+$/u, "Document code must follow pattern AREA-01.");
 
 const validationDecisionSchema = z.enum(validationDecisions);
 
@@ -35,6 +39,17 @@ export const createCaseInputSchema = z.object({
   requester: z.string().trim().min(2).max(120),
   categoryCode: supplierCategoryCodeSchema
 });
+
+export const updateSupplierInfoInputSchema = createCaseInputSchema
+  .pick({
+    supplierName: true,
+    supplierVat: true,
+    supplierContactName: true,
+    supplierContactEmail: true
+  })
+  .extend({
+    caseId: z.string().trim().uuid()
+  });
 
 export const caseSourceChannelSchema = z.enum(caseSourceChannels);
 
@@ -89,8 +104,8 @@ export const supplierBankAccountSchema = z
     bankn: z.string().trim().max(18).optional().nullable(),
     bkont: z.string().trim().max(2).optional().nullable(),
     accname: z.string().trim().min(2).max(40),
-    bkValidFrom: z.string().trim().date(),
-    bkValidTo: z.string().trim().date(),
+    bkValidFrom: z.string().trim().date().optional(),
+    bkValidTo: z.string().trim().date().optional(),
     iban: z.string().trim().max(34).optional().nullable()
   })
   .superRefine((value, ctx) => {
@@ -116,7 +131,11 @@ export const supplierBankAccountSchema = z
       }
     }
 
-    if (new Date(value.bkValidFrom).getTime() > new Date(value.bkValidTo).getTime()) {
+    if (
+      value.bkValidFrom !== undefined &&
+      value.bkValidTo !== undefined &&
+      new Date(value.bkValidFrom).getTime() > new Date(value.bkValidTo).getTime()
+    ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["bkValidTo"],
@@ -136,8 +155,8 @@ export const supplierBankAccountSchema = z
       bankn: bankn !== undefined && bankn.length > 0 ? bankn : null,
       bkont: bkont !== undefined && bkont.length > 0 ? bkont : null,
       accname: value.accname,
-      bkValidFrom: value.bkValidFrom,
-      bkValidTo: value.bkValidTo,
+      bkValidFrom: value.bkValidFrom ?? new Date().toISOString().slice(0, 10),
+      bkValidTo: value.bkValidTo ?? "9999-12-31",
       iban: iban !== undefined && iban.length > 0 ? normalizeIban(iban) : null
     };
   });
@@ -159,10 +178,45 @@ export const uploadedDocumentInputSchema = z.object({
 
 export const supplierSubmissionSchema = z.object({
   token: z.string().trim().uuid(),
-  address: z.string().trim().min(3).max(240),
-  country: z.string().trim().min(2).max(80),
+  address: z.object({
+    street: z.string().trim().min(2).max(180),
+    city: z.string().trim().min(2).max(120),
+    postalCode: z.string().trim().min(2).max(32),
+    country: z.string().trim().min(2).max(80)
+  }),
   bankAccount: supplierBankAccountSchema,
   uploadedDocuments: z.array(uploadedDocumentInputSchema)
+});
+
+export const supplierDraftSaveSchema = z.object({
+  token: z.string().trim().uuid(),
+  address: z
+    .object({
+      street: z.string().trim().max(180).optional(),
+      city: z.string().trim().max(120).optional(),
+      postalCode: z.string().trim().max(32).optional(),
+      country: z.string().trim().max(80).optional()
+    })
+    .default({}),
+  bankAccount: z
+    .object({
+      banks: z.string().trim().max(3).optional(),
+      bankl: z.string().trim().max(15).optional(),
+      bankn: z.string().trim().max(18).optional(),
+      bkont: z.string().trim().max(2).optional(),
+      accname: z.string().trim().max(40).optional(),
+      iban: z.string().trim().max(34).optional()
+    })
+    .default({})
+});
+
+export const supplierOtpRequestSchema = z.object({
+  token: z.string().trim().uuid()
+});
+
+export const supplierOtpVerifySchema = z.object({
+  token: z.string().trim().uuid(),
+  otpCode: z.string().trim().regex(/^\d{6}$/)
 });
 
 export const validateDocumentSchema = z.object({
@@ -220,4 +274,21 @@ export const requirementMatrixUpdateSchema = z.object({
   categoryCode: supplierCategoryCodeSchema,
   documentCode: documentCodeSchema,
   requirementLevel: requirementLevelSchema
+});
+
+export const documentDefinitionCreateSchema = z.object({
+  code: documentCodeSchema,
+  labelEn: z.string().trim().min(2).max(160),
+  labelEs: z.string().trim().min(2).max(160),
+  type: z.enum(["internal", "external", "internal_or_external"]),
+  expiryPolicy: z.enum(["no_expiry", "annual", "monthly"]),
+  owner: z.enum(["finance", "contracts_justifications", "compliance", "sustainability"]),
+  blocksPurchaseOrders: z.coerce.boolean()
+});
+
+export const documentDefinitionUpdateSchema = documentDefinitionCreateSchema;
+
+export const documentDefinitionStatusSchema = z.object({
+  code: documentCodeSchema,
+  active: z.coerce.boolean()
 });

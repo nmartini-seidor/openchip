@@ -5,7 +5,9 @@ import { requireSessionUser } from "@/lib/auth";
 import { onboardingRepository } from "@/lib/repository";
 import { countdownBadgeClass, getCountdown } from "@/lib/sla";
 import { SectionCard } from "@/components/section-card";
+import { StatusFilterSelect } from "@/components/status-filter-select";
 import { StatusBadge } from "@/components/status-badge";
+import { SupplierSearchFilter } from "@/components/supplier-search-filter";
 
 function countByStatus(statuses: readonly string[], status: string): number {
   return statuses.filter((value) => value === status).length;
@@ -30,13 +32,20 @@ function resolveStatusFilter(candidate: string | undefined): StatusFilter {
   return "all";
 }
 
-function buildOverviewHref(sourceFilter: SourceFilter, statusFilter: StatusFilter): string {
+function resolveSearchFilter(candidate: string | undefined): string {
+  return candidate?.trim() ?? "";
+}
+
+function buildOverviewHref(sourceFilter: SourceFilter, statusFilter: StatusFilter, searchFilter: string): string {
   const params = new URLSearchParams();
   if (sourceFilter !== "all") {
     params.set("source", sourceFilter);
   }
   if (statusFilter !== "all") {
     params.set("status", statusFilter);
+  }
+  if (searchFilter.length > 0) {
+    params.set("q", searchFilter);
   }
   const query = params.toString();
   return query.length > 0 ? `/?${query}` : "/";
@@ -56,7 +65,7 @@ function sortCases(left: { status: CaseStatus; updatedAt: string }, right: { sta
 export default async function HomePage({
   searchParams
 }: {
-  searchParams: Promise<{ source?: string; status?: string }>;
+  searchParams: Promise<{ source?: string; status?: string; q?: string }>;
 }) {
   await requireSessionUser();
 
@@ -70,11 +79,17 @@ export default async function HomePage({
   ]);
   const sourceFilter = resolveSourceFilter(params.source);
   const statusFilter = resolveStatusFilter(params.status);
+  const searchFilter = resolveSearchFilter(params.q);
+  const normalizedSearchFilter = searchFilter.toLowerCase();
 
   const filteredCases = cases.filter((onboardingCase) => {
     const matchesSource = sourceFilter === "all" || onboardingCase.sourceChannel === sourceFilter;
     const matchesStatus = statusFilter === "all" || onboardingCase.status === statusFilter;
-    return matchesSource && matchesStatus;
+    const matchesSearch =
+      normalizedSearchFilter.length === 0 ||
+      onboardingCase.supplierName.toLowerCase().includes(normalizedSearchFilter) ||
+      onboardingCase.supplierVat.toLowerCase().includes(normalizedSearchFilter);
+    return matchesSource && matchesStatus && matchesSearch;
   });
 
   const orderedCases = [...filteredCases].sort(sortCases);
@@ -82,11 +97,15 @@ export default async function HomePage({
   const countdownLabels = {
     notStarted: tSla("notStarted"),
     completed: tSla("completed"),
-    remaining: (duration: string) => tSla("remaining", { duration }),
+    remaining: (duration: string) => duration,
     overdue: (duration: string) => tSla("overdue", { duration })
   };
 
   const statuses = cases.map((item) => item.status);
+  const statusOptions = caseStatuses.map((status) => ({
+    value: status,
+    label: tStatus(status)
+  }));
 
   return (
     <main id="main-content" className="w-full space-y-5">
@@ -127,10 +146,20 @@ export default async function HomePage({
         </SectionCard>
       </section>
 
-      <SectionCard title={tHome("cases.title")} subtitle={tHome("cases.subtitle")}>
+      <SectionCard
+        title={tHome("cases.title")}
+        subtitle={tHome("cases.subtitle")}
+        headerAction={
+          <SupplierSearchFilter
+            label={tHome("cases.filters.searchLabel")}
+            placeholder={tHome("cases.filters.searchPlaceholder")}
+            value={searchFilter}
+          />
+        }
+      >
         <div className="mb-3 flex flex-wrap items-end gap-2">
           <Link
-            href={buildOverviewHref("all", statusFilter)}
+            href={buildOverviewHref("all", statusFilter, searchFilter)}
             className={`oc-btn oc-btn-compact ${
               sourceFilter === "all"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
@@ -140,7 +169,7 @@ export default async function HomePage({
             {tHome("cases.filters.all")}
           </Link>
           <Link
-            href={buildOverviewHref("sap_pr", statusFilter)}
+            href={buildOverviewHref("sap_pr", statusFilter, searchFilter)}
             className={`oc-btn oc-btn-compact ${
               sourceFilter === "sap_pr"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
@@ -150,7 +179,7 @@ export default async function HomePage({
             {tHome("cases.filters.sapPr")}
           </Link>
           <Link
-            href={buildOverviewHref("manual", statusFilter)}
+            href={buildOverviewHref("manual", statusFilter, searchFilter)}
             className={`oc-btn oc-btn-compact ${
               sourceFilter === "manual"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
@@ -160,25 +189,12 @@ export default async function HomePage({
             {tHome("cases.filters.manual")}
           </Link>
 
-          <form method="get" className="ml-auto flex items-end gap-2">
-            {sourceFilter !== "all" ? <input type="hidden" name="source" value={sourceFilter} /> : null}
-            <div className="grid gap-1">
-              <label htmlFor="statusFilter" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-                {tHome("cases.filters.statusLabel")}
-              </label>
-              <select id="statusFilter" name="status" defaultValue={statusFilter} className="oc-input oc-select min-h-8 py-1 text-xs">
-                <option value="all">{tHome("cases.filters.allStatuses")}</option>
-                {caseStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {tStatus(status)}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" className="oc-btn oc-btn-secondary oc-btn-compact">
-              {tHome("cases.filters.apply")}
-            </button>
-          </form>
+          <StatusFilterSelect
+            label={tHome("cases.filters.statusLabel")}
+            allLabel={tHome("cases.filters.allStatuses")}
+            value={statusFilter}
+            options={statusOptions}
+          />
         </div>
         {filteredCases.length === 0 ? (
           <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm text-slate-600">

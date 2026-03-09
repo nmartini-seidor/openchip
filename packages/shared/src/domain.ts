@@ -90,7 +90,7 @@ export const documentCodes = [
   "DPO-02"
 ] as const;
 
-export type DocumentCode = (typeof documentCodes)[number];
+export type DocumentCode = string;
 
 export const requirementLevels = ["mandatory", "optional", "not_applicable"] as const;
 
@@ -104,27 +104,160 @@ export type OwnerDepartment = "finance" | "contracts_justifications" | "complian
 
 export interface DocumentDefinition {
   code: DocumentCode;
-  name: string;
+  labelEn: string;
+  labelEs: string;
   type: DocumentType;
   expiryPolicy: ExpiryPolicy;
   owner: OwnerDepartment;
   blocksPurchaseOrders: boolean;
+  active: boolean;
+  templateStoragePath: string | null;
 }
 
 export const documentCatalog: readonly DocumentDefinition[] = [
-  { code: "FIN-01", name: "Standard Supplier Onboarding Form", type: "internal", expiryPolicy: "no_expiry", owner: "finance", blocksPurchaseOrders: true },
-  { code: "FIN-02", name: "Bank Account Ownership Certificate", type: "external", expiryPolicy: "no_expiry", owner: "finance", blocksPurchaseOrders: true },
-  { code: "FIN-03", name: "Proforma Invoice", type: "external", expiryPolicy: "no_expiry", owner: "finance", blocksPurchaseOrders: false },
-  { code: "TAX-01", name: "Tax Residency Certificate (Double Taxation)", type: "external", expiryPolicy: "annual", owner: "finance", blocksPurchaseOrders: true },
-  { code: "TAX-02", name: "Tax Compliance Certificate - Subcontractors", type: "external", expiryPolicy: "monthly", owner: "finance", blocksPurchaseOrders: true },
-  { code: "SS-01", name: "Social Security Compliance Certificate - Subcontractors", type: "external", expiryPolicy: "monthly", owner: "finance", blocksPurchaseOrders: true },
-  { code: "TAX-03", name: "Tax Registration Certificate", type: "external", expiryPolicy: "annual", owner: "contracts_justifications", blocksPurchaseOrders: true },
-  { code: "LEG-01", name: "Code of Conduct", type: "internal_or_external", expiryPolicy: "no_expiry", owner: "contracts_justifications", blocksPurchaseOrders: false },
-  { code: "SUB-01", name: "Subsidized Project Communication", type: "internal", expiryPolicy: "annual", owner: "contracts_justifications", blocksPurchaseOrders: false },
-  { code: "SUB-02", name: "Subsidized Project Declarations", type: "internal", expiryPolicy: "annual", owner: "contracts_justifications", blocksPurchaseOrders: false },
-  { code: "SUS-01", name: "Sustainability Form", type: "internal", expiryPolicy: "no_expiry", owner: "sustainability", blocksPurchaseOrders: false },
-  { code: "DPO-01", name: "Data Processing Questionnaire", type: "internal", expiryPolicy: "no_expiry", owner: "compliance", blocksPurchaseOrders: false },
-  { code: "DPO-02", name: "Data Questionnaire 2", type: "internal", expiryPolicy: "no_expiry", owner: "compliance", blocksPurchaseOrders: false }
+  {
+    code: "FIN-01",
+    labelEn: "Standard Supplier Onboarding Form",
+    labelEs: "Formulario estándar de alta de proveedor",
+    type: "internal",
+    expiryPolicy: "no_expiry",
+    owner: "finance",
+    blocksPurchaseOrders: true,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "FIN-02",
+    labelEn: "Bank Account Ownership Certificate",
+    labelEs: "Certificado de titularidad bancaria",
+    type: "external",
+    expiryPolicy: "no_expiry",
+    owner: "finance",
+    blocksPurchaseOrders: true,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "FIN-03",
+    labelEn: "Proforma Invoice",
+    labelEs: "Factura proforma",
+    type: "external",
+    expiryPolicy: "no_expiry",
+    owner: "finance",
+    blocksPurchaseOrders: false,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "TAX-01",
+    labelEn: "Tax Residency Certificate (Double Taxation)",
+    labelEs: "Certificado de residencia fiscal (doble imposición)",
+    type: "external",
+    expiryPolicy: "annual",
+    owner: "finance",
+    blocksPurchaseOrders: true,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "TAX-02",
+    labelEn: "Tax Compliance Certificate - Subcontractors",
+    labelEs: "Certificado de cumplimiento tributario - subcontratas",
+    type: "external",
+    expiryPolicy: "monthly",
+    owner: "finance",
+    blocksPurchaseOrders: true,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "SS-01",
+    labelEn: "Social Security Compliance Certificate - Subcontractors",
+    labelEs: "Certificado de cumplimiento de Seguridad Social - subcontratas",
+    type: "external",
+    expiryPolicy: "monthly",
+    owner: "finance",
+    blocksPurchaseOrders: true,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "TAX-03",
+    labelEn: "Tax Registration Certificate",
+    labelEs: "Certificado de alta fiscal",
+    type: "external",
+    expiryPolicy: "annual",
+    owner: "contracts_justifications",
+    blocksPurchaseOrders: true,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "LEG-01",
+    labelEn: "Code of Conduct",
+    labelEs: "Código de conducta",
+    type: "internal_or_external",
+    expiryPolicy: "no_expiry",
+    owner: "contracts_justifications",
+    blocksPurchaseOrders: false,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "SUB-01",
+    labelEn: "Subsidized Project Communication",
+    labelEs: "Comunicación de proyecto subvencionado",
+    type: "internal",
+    expiryPolicy: "annual",
+    owner: "contracts_justifications",
+    blocksPurchaseOrders: false,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "SUB-02",
+    labelEn: "Subsidized Project Declarations",
+    labelEs: "Declaraciones de proyecto subvencionado",
+    type: "internal",
+    expiryPolicy: "annual",
+    owner: "contracts_justifications",
+    blocksPurchaseOrders: false,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "SUS-01",
+    labelEn: "Sustainability Form",
+    labelEs: "Formulario de sostenibilidad",
+    type: "internal",
+    expiryPolicy: "no_expiry",
+    owner: "sustainability",
+    blocksPurchaseOrders: false,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "DPO-01",
+    labelEn: "Data Processing Questionnaire",
+    labelEs: "Cuestionario de tratamiento de datos",
+    type: "internal",
+    expiryPolicy: "no_expiry",
+    owner: "compliance",
+    blocksPurchaseOrders: false,
+    active: true,
+    templateStoragePath: null
+  },
+  {
+    code: "DPO-02",
+    labelEn: "Data Questionnaire 2",
+    labelEs: "Cuestionario de datos 2",
+    type: "internal",
+    expiryPolicy: "no_expiry",
+    owner: "compliance",
+    blocksPurchaseOrders: false,
+    active: true,
+    templateStoragePath: null
+  }
 ] as const;
 
 export const internalRoles = [
@@ -199,7 +332,7 @@ export interface StatusHistoryEntry {
   note: string;
 }
 
-export const caseActionTypes = ["expiration_reminder_sent"] as const;
+export const caseActionTypes = ["expiration_reminder_sent", "supplier_info_updated"] as const;
 
 export type CaseActionType = (typeof caseActionTypes)[number];
 
@@ -256,6 +389,28 @@ export interface UploadedDocumentInput {
   files: UploadedDocumentFile[];
 }
 
+export interface SupplierAddress {
+  street: string;
+  city: string;
+  postalCode: string;
+  country: string;
+}
+
+export interface SupplierDraft {
+  address: Partial<SupplierAddress>;
+  bankAccount: Partial<SupplierBankAccount>;
+  uploadedDocuments: UploadedDocumentInput[];
+  updatedAt: string;
+}
+
+export interface SupplierOtpState {
+  code: string | null;
+  expiresAt: string | null;
+  attemptsRemaining: number;
+  requestedAt: string | null;
+  verifiedAt: string | null;
+}
+
 export interface OnboardingCase {
   id: string;
   supplierName: string;
@@ -278,9 +433,11 @@ export interface OnboardingCase {
   invitationOpenDeadlineAt: string | null;
   onboardingCompletionDeadlineAt: string | null;
   slaSnapshot: SlaSnapshot;
-  supplierAddress: string | null;
+  supplierAddress: SupplierAddress | null;
   supplierCountry: string | null;
   supplierBankAccount: SupplierBankAccount | null;
+  supplierDraft: SupplierDraft | null;
+  supplierOtpState: SupplierOtpState;
   createdAt: string;
   updatedAt: string;
   statusHistory: StatusHistoryEntry[];
@@ -340,6 +497,36 @@ export interface RequirementMatrixUpdateInput {
   requirementLevel: RequirementLevel;
 }
 
+export interface DocumentDefinitionCreateInput {
+  code: DocumentCode;
+  labelEn: string;
+  labelEs: string;
+  type: DocumentType;
+  expiryPolicy: ExpiryPolicy;
+  owner: OwnerDepartment;
+  blocksPurchaseOrders: boolean;
+}
+
+export interface DocumentDefinitionUpdateInput {
+  code: DocumentCode;
+  labelEn: string;
+  labelEs: string;
+  type: DocumentType;
+  expiryPolicy: ExpiryPolicy;
+  owner: OwnerDepartment;
+  blocksPurchaseOrders: boolean;
+}
+
+export interface DocumentDefinitionStatusInput {
+  code: DocumentCode;
+  active: boolean;
+}
+
+export interface DocumentTemplatePathUpdateInput {
+  code: DocumentCode;
+  templateStoragePath: string | null;
+}
+
 export interface CreateCaseInput {
   supplierName: string;
   supplierVat: string;
@@ -347,6 +534,14 @@ export interface CreateCaseInput {
   supplierContactEmail: string;
   requester: string;
   categoryCode: SupplierCategoryCode;
+}
+
+export interface UpdateSupplierInfoInput {
+  caseId: string;
+  supplierName: string;
+  supplierVat: string;
+  supplierContactName: string;
+  supplierContactEmail: string;
 }
 
 export interface SapPurchaseRequestNewSupplierInput {
@@ -368,10 +563,24 @@ export interface SapPurchaseRequestNewSupplierInput {
 
 export interface SupplierSubmissionInput {
   token: string;
-  address: string;
-  country: string;
+  address: SupplierAddress;
   bankAccount: SupplierBankAccount;
   uploadedDocuments: UploadedDocumentInput[];
+}
+
+export interface SupplierDraftSaveInput {
+  token: string;
+  address: Partial<SupplierAddress>;
+  bankAccount: Partial<SupplierBankAccount>;
+}
+
+export interface SupplierOtpRequestInput {
+  token: string;
+}
+
+export interface SupplierOtpVerifyInput {
+  token: string;
+  otpCode: string;
 }
 
 export interface ValidateDocumentInput {
@@ -386,6 +595,8 @@ export interface SupplierSession {
   token: string;
   caseId: string;
   expiresAt: string;
+  otpVerified: boolean;
+  supplierContactEmail: string;
 }
 
 export interface IntegrationEvent {

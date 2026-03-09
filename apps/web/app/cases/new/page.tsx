@@ -5,7 +5,7 @@ import { createCaseAction } from "@/app/actions";
 import { CategoryRequirementsSelector } from "@/components/category-requirements-selector";
 import { NewCaseSubmitButton } from "@/components/new-case-submit-button";
 import { SectionCard } from "@/components/section-card";
-import { VatInput } from "@/components/vat-input";
+import { SupplierCoreFields } from "@/components/supplier-core-fields";
 import { requireSessionRole } from "@/lib/auth";
 import { onboardingRepository } from "@/lib/repository";
 
@@ -80,39 +80,14 @@ export default async function NewCasePage({ searchParams }: NewCasePageProps) {
             <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{errorMessage}</p>
           ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
-            <div className="grid gap-2 self-start">
-              <label htmlFor="supplierName" className="min-h-[1.5rem] text-sm font-semibold text-slate-700">
-                {t("supplierName")}
-                <span className="text-red-600" aria-hidden> *</span>
-              </label>
-              <input id="supplierName" name="supplierName" required autoComplete="organization" className="oc-input" />
-            </div>
-
-            <VatInput label={t("supplierVat")} inputId="supplierVat" inputName="supplierVat" />
-
-            <div className="grid gap-2">
-              <label htmlFor="supplierContactName" className="text-sm font-semibold text-slate-700">
-                {t("supplierContactName")}
-                <span className="text-red-600" aria-hidden> *</span>
-              </label>
-              <input id="supplierContactName" name="supplierContactName" required autoComplete="name" className="oc-input" />
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="supplierContactEmail" className="text-sm font-semibold text-slate-700">
-                {t("supplierContactEmail")}
-                <span className="text-red-600" aria-hidden> *</span>
-              </label>
-              <input
-                id="supplierContactEmail"
-                name="supplierContactEmail"
-                required
-                type="email"
-                autoComplete="email"
-                spellCheck={false}
-                inputMode="email"
-                className="oc-input"
-              />
-            </div>
+            <SupplierCoreFields
+              labels={{
+                supplierName: t("supplierName"),
+                supplierVat: t("supplierVat"),
+                supplierContactName: t("supplierContactName"),
+                supplierContactEmail: t("supplierContactEmail")
+              }}
+            />
 
             <CategoryRequirementsSelector categories={categories} previewsByCategory={previewsByCategory} />
           </div>

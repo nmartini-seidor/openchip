@@ -24,9 +24,17 @@ export interface ExpiryReminderEmailInput {
   documentCodes: string[];
 }
 
+export interface SupplierOtpEmailInput {
+  to: string;
+  supplierName: string;
+  otpCode: string;
+  expiresAt: string;
+}
+
 export interface EmailAdapter {
   sendInvitationEmail(input: InvitationEmailInput): Promise<SentEmailRecord>;
   sendExpiryReminderEmail(input: ExpiryReminderEmailInput): Promise<SentEmailRecord>;
+  sendSupplierOtpEmail(input: SupplierOtpEmailInput): Promise<SentEmailRecord>;
   listSentEmails(): Promise<SentEmailRecord[]>;
   clearSentEmails(): Promise<void>;
 }
@@ -110,6 +118,28 @@ function buildReminderContent(input: ExpiryReminderEmailInput): { subject: strin
   return { subject, text, html };
 }
 
+function buildSupplierOtpContent(input: SupplierOtpEmailInput): { subject: string; text: string; html: string } {
+  const subject = `Openchip supplier access code - ${input.supplierName}`;
+  const text = [
+    `Hello,`,
+    ``,
+    `Your verification code for ${input.supplierName} supplier onboarding is: ${input.otpCode}`,
+    `This code expires at: ${input.expiresAt}`,
+    ``,
+    `Openchip Onboarding Team`
+  ].join("\n");
+
+  const html = `
+    <p>Hello,</p>
+    <p>Your verification code for <strong>${input.supplierName}</strong> supplier onboarding is:</p>
+    <p style="font-size:20px;font-weight:700;letter-spacing:0.08em;">${input.otpCode}</p>
+    <p>This code expires at: <strong>${input.expiresAt}</strong></p>
+    <p>Openchip Onboarding Team</p>
+  `;
+
+  return { subject, text, html };
+}
+
 export function createEmailAdapter(config: EmailAdapterConfig): EmailAdapter {
   const store = getEmailStore();
 
@@ -159,6 +189,10 @@ export function createEmailAdapter(config: EmailAdapterConfig): EmailAdapter {
     },
     async sendExpiryReminderEmail(input) {
       const content = buildReminderContent(input);
+      return deliver(input.to, content.subject, content.text, content.html);
+    },
+    async sendSupplierOtpEmail(input) {
+      const content = buildSupplierOtpContent(input);
       return deliver(input.to, content.subject, content.text, content.html);
     },
     async listSentEmails() {

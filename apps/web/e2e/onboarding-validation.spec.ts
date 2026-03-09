@@ -23,7 +23,7 @@ test("reject then resubmit document flow works", async ({ page, request }, testI
   });
 
   const supplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, supplierUrl, caseId);
+  await submitSupplierResponse(page, supplierUrl, caseId, "reject@example.com");
 
   const finRow = page.locator("tr").filter({ has: page.getByText(/^FIN-01$/) }).first();
   await finRow.locator('select[name="decision"]').selectOption("reject");
@@ -51,7 +51,7 @@ test("approve provisionally decision is persisted", async ({ page, request }, te
   });
 
   const supplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, supplierUrl, caseId);
+  await submitSupplierResponse(page, supplierUrl, caseId, "provisional@example.com");
 
   const finRow = page.locator("tr").filter({ has: page.getByText(/^FIN-01$/) }).first();
   await finRow.locator('select[name="decision"]').selectOption("approve_provisionally");

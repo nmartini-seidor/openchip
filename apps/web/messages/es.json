@@ -8,16 +8,16 @@
     "companyTool": "Supplier Onboarding Portal",
     "nav": {
       "overview": "Resumen",
-      "newCase": "Nuevo Caso",
+      "newCase": "Nuevo Proveedor",
       "users": "Usuarios",
       "portalSettings": "Configuración del Portal"
     },
-    "createCase": "Crear Caso",
+    "createCase": "Crear Proveedor",
     "loginTitle": "Iniciar sesión",
     "guestInitials": "IN",
     "logout": "Cerrar sesión",
     "page": {
-      "case": "Caso",
+      "case": "Proveedor",
       "supplierPortal": "Portal de Proveedor"
     },
     "language": {
@@ -47,7 +47,7 @@
     "invitationSla": "Invitación",
     "completionSla": "Finalización",
     "labels": {
-      "case": "Caso",
+      "case": "Proveedor",
       "category": "Categoría"
     },
     "sourceChannel": {
@@ -77,27 +77,29 @@
     "overview": {
       "title": "Resumen operativo",
       "subtitle": "Seguimiento de capacidad y cuellos de botella",
-      "totalCases": "Casos totales",
+      "totalCases": "Proveedores totales",
       "pendingValidation": "Validación pendiente",
       "createdInSap": "Creado en SAP"
     },
     "quickActions": {
       "title": "Acciones rápidas",
       "subtitle": "Comandos más usados",
-      "createCase": "Crear caso",
-      "helperText": "La revisión y validación se gestiona desde cada espacio de caso."
+      "createCase": "Crear proveedor",
+      "helperText": "La revisión y validación se gestiona desde cada espacio de proveedor."
     },
     "cases": {
-      "title": "Casos de onboarding",
+      "title": "Proveedores en onboarding",
       "subtitle": "Cola operativa",
-      "empty": "Todavía no hay casos. Crea un nuevo caso para empezar.",
-      "emptyFiltered": "No hay casos para los filtros seleccionados.",
+      "empty": "Todavía no hay proveedores. Crea un nuevo proveedor para empezar.",
+      "emptyFiltered": "No hay proveedores para los filtros seleccionados.",
       "filters": {
         "all": "Todos",
         "sapPr": "PR SAP",
         "manual": "Manual",
         "statusLabel": "Estado",
         "allStatuses": "Todos los estados",
+        "searchLabel": "Buscar",
+        "searchPlaceholder": "Nombre o NIF/CIF / VAT",
         "apply": "Aplicar"
       },
       "table": {
@@ -105,26 +107,33 @@
         "source": "Origen",
         "status": "Estado",
         "action": "Acción",
-        "openCase": "Abrir caso"
+        "openCase": "Abrir proveedor"
       }
     }
   },
   "NewCase": {
     "goBack": "Volver",
-    "title": "Crear caso de onboarding",
+    "title": "Crear proveedor de onboarding",
     "subtitle": "Formulario interno de inicio",
     "supplierName": "Nombre del proveedor",
     "supplierVat": "NIF/CIF / Tax ID del proveedor",
     "supplierContactName": "Nombre de contacto del proveedor",
     "supplierContactEmail": "Correo de contacto del proveedor",
     "requester": "Solicitante",
-    "createCase": "Crear caso de onboarding",
-    "creatingCase": "Creando caso...",
+    "createCase": "Crear proveedor de onboarding",
+    "creatingCase": "Creando proveedor...",
     "errors": {
       "validation": "Revisa los campos obligatorios. El NIF/CIF o Tax ID debe tener al menos 3 caracteres.",
-      "duplicateVat": "Ya existe un caso de onboarding para este NIF/CIF o Tax ID.",
-      "unknown": "No se pudo crear el caso. Inténtalo de nuevo."
+      "duplicateVat": "Ya existe un proveedor de onboarding para este NIF/CIF o Tax ID.",
+      "unknown": "No se pudo crear el proveedor. Inténtalo de nuevo."
     }
+  },
+  "EditCase": {
+    "goBack": "Volver",
+    "title": "Editar información del proveedor",
+    "subtitle": "Actualiza los datos del proveedor para este proveedor",
+    "save": "Guardar cambios",
+    "saving": "Guardando cambios..."
   },
   "VatInput": {
     "validate": "Validar NIF/CIF",
@@ -132,7 +141,7 @@
   },
   "CaseDetails": {
     "controls": {
-      "title": "Controles del caso",
+      "title": "Controles del proveedor",
       "subtitle": "Acciones disponibles para el estado actual",
       "sendInvitation": "Enviar invitación",
       "sendingInvitation": "Enviando invitación...",
@@ -146,16 +155,23 @@
       "resubmittingRejected": "Reenviando documentos...",
       "sendExpiryReminder": "Enviar recordatorio de expiración",
       "sendingReminder": "Enviando recordatorio...",
-      "cancelCase": "Cancelar caso",
+      "cancelCase": "Cancelar onboarding de proveedor",
       "cancellationReason": "Motivo de cancelación",
       "defaultCancellationReason": "Cancelado por solicitante interno",
-      "cancellingCase": "Cancelando caso...",
+      "cancellingCase": "Cancelando proveedor...",
       "goBack": "Volver",
       "openSupplierPortal": "Abrir portal del proveedor",
       "copySupplierLink": "Enlace proveedor",
       "copyMagicLink": "Copiar enlace mágico de proveedor",
       "magicLinkCopied": "Copiado",
-      "invitationNotGenerated": "La invitación todavía no se ha generado."
+      "invitationNotGenerated": "La invitación todavía no se ha generado.",
+      "editSupplierInfo": "Editar información del proveedor",
+      "supplierName": "Nombre del proveedor",
+      "supplierVat": "NIF/CIF / Tax ID del proveedor",
+      "supplierContactName": "Nombre de contacto del proveedor",
+      "supplierContactEmail": "Correo de contacto del proveedor",
+      "saveSupplierInfo": "Guardar datos del proveedor",
+      "savingSupplierInfo": "Guardando datos del proveedor..."
     },
     "requirements": {
       "title": "Requisitos documentales",
@@ -192,7 +208,7 @@
       "title": "Historial de estado"
     },
     "metadata": {
-      "title": "Metadatos del caso",
+      "title": "Metadatos del proveedor",
       "requester": "Solicitante",
       "supplierCategory": "Categoría de proveedor",
       "source": "Origen",
@@ -225,12 +241,13 @@
   "StatusTimeline": {
     "actor": "Usuario",
     "action": {
-      "expiration_reminder_sent": "Recordatorio de expiración enviado"
+      "expiration_reminder_sent": "Recordatorio de expiración enviado",
+      "supplier_info_updated": "Información del proveedor actualizada"
     }
   },
   "WorkflowSwimlane": {
     "title": "Flujo",
-    "cancelled": "El caso está cancelado.",
+    "cancelled": "El proveedor está cancelado.",
     "steps": {
       "onboarding_initiated": {
         "lane": "Interno",
@@ -301,6 +318,33 @@
       "addCategory": "Añadir categoría",
       "addingCategory": "Añadiendo..."
     },
+    "documents": {
+      "title": "Catálogo documental",
+      "subtitle": "Gestiona definiciones documentales, etiquetas y plantillas",
+      "code": "Código",
+      "labelEn": "Etiqueta (EN)",
+      "labelEs": "Etiqueta (ES)",
+      "type": "Tipo",
+      "expiryPolicy": "Política de caducidad",
+      "owner": "Propietario",
+      "status": "Estado",
+      "active": "Activo",
+      "inactive": "Inactivo",
+      "activate": "Activar",
+      "deactivate": "Desactivar",
+      "blocksPurchaseOrders": "Bloquea pedidos de compra",
+      "yes": "Sí",
+      "no": "No",
+      "save": "Guardar",
+      "saving": "Guardando...",
+      "uploadTemplate": "Subir plantilla",
+      "uploadingTemplate": "Subiendo...",
+      "downloadTemplate": "Descargar plantilla",
+      "clearTemplate": "Quitar plantilla",
+      "noTemplate": "Sin plantilla subida",
+      "addDocument": "Añadir documento",
+      "addingDocument": "Añadiendo..."
+    },
     "requirementMatrix": {
       "title": "Matriz de requisitos",
       "subtitle": "Edita requisitos documentales por categoría",
@@ -346,7 +390,11 @@
     "subtitle": "Completa la información de onboarding",
     "supplier": "Proveedor",
     "submitted": "Respuesta enviada. El equipo interno continuará el proceso.",
-    "address": "Dirección",
+    "resumeNotice": "Puedes guardar tu progreso y retomar el onboarding en cualquier momento antes del envío final.",
+    "draftSavedNotice": "Borrador guardado.",
+    "street": "Calle",
+    "city": "Ciudad",
+    "postalCode": "Código postal",
     "country": "País",
     "countryPlaceholder": "Selecciona un país",
     "bankSectionTitle": "Datos bancarios",
@@ -356,23 +404,48 @@
     "bankn": "Número de cuenta bancaria (BANKN)",
     "bkont": "Clave de control (BKONT)",
     "accname": "Titular de la cuenta bancaria",
-    "bkValidFrom": "Inicio de vigencia bancaria",
-    "bkValidTo": "Fin de vigencia bancaria",
     "iban": "IBAN",
+    "saveDraft": "Guardar progreso",
+    "savingDraft": "Guardando progreso...",
+    "draftSaved": "Progreso guardado",
+    "draftSaveError": "No se pudo guardar el progreso ahora.",
     "submit": "Enviar respuesta",
     "submitting": "Enviando...",
     "requiredDocsTitle": "Documentación requerida",
-    "requiredDocsSubtitle": "Sube uno o varios archivos por requisito",
+    "requiredDocsSubtitle": "Abre un requisito, descarga plantilla si existe y sube uno o varios archivos.",
+    "uploadFiles": "Subir archivos",
+    "uploadingFiles": "Subiendo archivos...",
+    "templateDownload": "Descargar plantilla",
+    "noTemplate": "No hay plantilla disponible para este requisito.",
+    "uploadedFiles": "Archivos subidos",
+    "noFiles": "Aún no hay archivos subidos.",
+    "otp": {
+      "title": "Verifica el acceso",
+      "subtitle": "Solicita un código de un solo uso enviado a {email} e introdúcelo para continuar.",
+      "requestCode": "Enviar código de verificación",
+      "requestingCode": "Enviando código...",
+      "codeLabel": "Código de verificación",
+      "verify": "Verificar código",
+      "verifying": "Verificando...",
+      "requested": "Código de verificación enviado.",
+      "verified": "Acceso verificado.",
+      "failed": "No se pudo enviar el código de verificación.",
+      "expired": "El código de verificación ha caducado. Solicita uno nuevo.",
+      "attemptsExceeded": "Demasiados intentos fallidos. Solicita un nuevo código de verificación.",
+      "notRequested": "Solicita primero un código de verificación.",
+      "invalid": "Código de verificación inválido."
+    },
     "errors": {
       "validation": "Revisa los datos y archivos. Los requisitos obligatorios deben incluir al menos un archivo.",
       "missingMandatoryDocuments": "Faltan archivos en uno o más requisitos obligatorios.",
       "expired": "Este enlace de proveedor ha caducado.",
-      "notFound": "Este caso de proveedor ya no está disponible."
+      "notFound": "Este proveedor ya no está disponible.",
+      "otpRequired": "Completa la verificación OTP para acceder al formulario de onboarding."
     }
   },
   "NotFound": {
     "title": "Recurso no encontrado",
-    "description": "El caso de proveedor o enlace de invitación es inválido, ha vencido o ya no está disponible.",
+    "description": "El proveedor o enlace de invitación es inválido, ha vencido o ya no está disponible.",
     "back": "Volver al panel"
   }
 }

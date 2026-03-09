@@ -60,8 +60,6 @@ export async function POST(request: Request, context: { params: Promise<{ token:
   );
 
   return NextResponse.json({
-    uploadUrl: null,
-    method: "POST",
     code: parsedCode.data,
     files: savedFiles
   });

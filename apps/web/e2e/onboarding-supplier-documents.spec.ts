@@ -22,7 +22,7 @@ test("supplier uploads are visible to internal users and expiry can be edited", 
   });
 
   const supplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, supplierUrl, caseId);
+  await submitSupplierResponse(page, supplierUrl, caseId, "evidence@example.com");
 
   const fileLinks = page.locator('a[href*="/api/cases/"][href*="/files/"]');
   await expect(fileLinks.first()).toBeVisible();

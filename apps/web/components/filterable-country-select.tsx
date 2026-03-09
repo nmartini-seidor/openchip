@@ -11,6 +11,8 @@ interface FilterableCountrySelectProps {
   options: CountryOption[];
   placeholder: string;
   defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
   required?: boolean;
 }
 
@@ -21,13 +23,20 @@ export function FilterableCountrySelect({
   options,
   placeholder,
   defaultValue,
+  value,
+  onValueChange,
   required = false
 }: FilterableCountrySelectProps) {
   const defaultOption = useMemo(
     () => (defaultValue === undefined ? null : options.find((option) => option.value === defaultValue) ?? null),
     [defaultValue, options]
   );
-  const [selectedOption, setSelectedOption] = useState<CountryOption | null>(defaultOption);
+  const [internalOption, setInternalOption] = useState<CountryOption | null>(defaultOption);
+  const controlledOption = useMemo(
+    () => (value === undefined ? undefined : options.find((option) => option.value === value) ?? null),
+    [options, value]
+  );
+  const selectedOption = controlledOption ?? internalOption;
 
   return (
     <div className="grid gap-2">
@@ -40,7 +49,10 @@ export function FilterableCountrySelect({
         options={options}
         value={selectedOption}
         onChange={(option: SingleValue<CountryOption>) => {
-          setSelectedOption(option ?? null);
+          if (value === undefined) {
+            setInternalOption(option ?? null);
+          }
+          onValueChange?.(option?.value ?? "");
         }}
         placeholder={placeholder}
         isSearchable

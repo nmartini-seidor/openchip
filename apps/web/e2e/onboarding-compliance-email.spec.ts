@@ -25,7 +25,7 @@ test("expired mandatory document enables PO block", async ({ page, request }, te
   });
 
   const supplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, supplierUrl, caseId);
+  await submitSupplierResponse(page, supplierUrl, caseId, "expiry@example.com");
   await approveAllMandatory(page);
 
   const setExpiryResponse = await request.post(`/api/test/cases/${caseId}/set-document-expiry`, {

@@ -34,7 +34,7 @@ test("happy path reaches supplier_created_in_sap and records media", async ({ pa
 
   await assertEmailContains(request, supplierEmail, "onboarding invitation", "/supplier/");
 
-  await submitSupplierResponse(page, supplierUrl, caseId);
+  await submitSupplierResponse(page, supplierUrl, caseId, supplierEmail);
   await captureCheckpoint(page, testInfo, "03-submission-completed");
 
   await approveAllMandatory(page);
