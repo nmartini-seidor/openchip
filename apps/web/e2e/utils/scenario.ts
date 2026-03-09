@@ -73,12 +73,22 @@ export async function createCaseViaUi(page: Page, input: NewCaseInput): Promise<
 
 export async function sendInvitationFromCase(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Send invitation" }).click();
-  const supplierLink = page.getByRole("link", { name: "Open supplier portal" });
-  await expect(supplierLink).toBeVisible();
+  const supplierLink = page.getByRole("link", { name: /Open supplier portal|Abrir portal del proveedor/ });
+  if (await supplierLink.count()) {
+    await expect(supplierLink).toBeVisible();
+    const href = await supplierLink.getAttribute("href");
+    if (href === null) {
+      throw new Error("Missing supplier portal link after invitation.");
+    }
 
-  const href = await supplierLink.getAttribute("href");
+    return href;
+  }
+
+  const copyLinkButton = page.getByRole("button", { name: /Supplier Link|Enlace proveedor/ });
+  await expect(copyLinkButton).toBeVisible();
+  const href = await copyLinkButton.getAttribute("data-link-value");
   if (href === null) {
-    throw new Error("Missing supplier portal link after invitation.");
+    throw new Error("Missing supplier portal value after invitation.");
   }
 
   return href;
@@ -87,7 +97,31 @@ export async function sendInvitationFromCase(page: Page): Promise<string> {
 export async function submitSupplierResponse(page: Page, supplierUrl: string, caseId: string): Promise<void> {
   await page.goto(supplierUrl);
   await page.getByLabel(/Address|Dirección/).fill("Carrer de Mallorca 123");
-  await page.getByLabel(/Country|País/).fill("Spain");
+  await page.locator("#country").click();
+  await page.locator("#country").fill("Spain");
+  await page.keyboard.press("Enter");
+
+  await page.locator("#banks").click();
+  await page.locator("#banks").fill("Spain");
+  await page.keyboard.press("Enter");
+
+  await page.getByLabel(/Bank key|Clave banco/).fill("2100");
+  await page.getByLabel(/IBAN/).fill("ES9121000418450200051332");
+  await page.getByLabel(/Bank account holder name|Titular de la cuenta bancaria/).fill("Proveedor Demo SL");
+  await page.getByLabel(/Bank validity start|Inicio de vigencia bancaria/).fill("2026-01-01");
+  await page.getByLabel(/Bank validity end|Fin de vigencia bancaria/).fill("2027-01-01");
+
+  const uploadInputs = page.locator('input[type="file"]');
+  const uploadCount = await uploadInputs.count();
+  for (let index = 0; index < uploadCount; index += 1) {
+    await uploadInputs.nth(index).setInputFiles([
+      {
+        name: `requirement-${index + 1}.pdf`,
+        mimeType: "application/pdf",
+        buffer: Buffer.from("%PDF-1.4 demo")
+      }
+    ]);
+  }
   await page.getByRole("button", { name: /Submit supplier response|Enviar respuesta/ }).click();
 
   await expect(page).toHaveURL(new RegExp(`/supplier/.+\?submitted=1$`));

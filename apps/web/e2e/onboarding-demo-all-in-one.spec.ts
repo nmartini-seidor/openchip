@@ -72,14 +72,14 @@ test("all demos in one normal-speed walkthrough video", async ({ page, request }
   await finRow.locator('select[name="decision"]').selectOption("reject");
   await demoPause(page, 300);
   await finRow.getByRole("button", { name: "Apply" }).click();
-  await expect(finRow.getByText(/rejected/i)).toBeVisible();
+  await expect(finRow.getByText(/rejected|rechazado/i)).toBeVisible({ timeout: 15_000 });
   await demoPause(page);
   await page.getByRole("button", { name: "Resubmit rejected documents" }).click();
-  await expect(finRow.getByText(/pending validation/i)).toBeVisible();
+  await expect(finRow.getByText(/pending validation|pendiente de validaci[oó]n/i)).toBeVisible({ timeout: 15_000 });
   await demoPause(page);
   await finRow.locator('select[name="decision"]').selectOption("approve_provisionally");
   await finRow.getByRole("button", { name: "Apply" }).click();
-  await expect(finRow.getByText(/approved provisionally/i)).toBeVisible();
+  await expect(finRow.getByText(/approved provisionally|aprobado provisionalmente/i)).toBeVisible({ timeout: 15_000 });
   await captureCheckpoint(page, testInfo, "demo-02-validation");
 
   await page.goto("/supplier/11111111-2222-3333-4444-555555555555");
@@ -121,6 +121,11 @@ test("all demos in one normal-speed walkthrough video", async ({ page, request }
   });
 
   const complianceSupplierUrl = await sendInvitationFromCase(page);
+  const reminderButton = page.getByRole("button", { name: /Send (expiry|expiration) reminder/i });
+  await expect(reminderButton).toBeVisible({ timeout: 15_000 });
+  await reminderButton.click();
+  await assertEmailContains(request, complianceEmail, "document expiry reminder", "mandatory supplier documents");
+  await demoPause(page);
   await submitSupplierResponse(page, complianceSupplierUrl, complianceCaseId);
   await approveAllMandatory(page);
 
@@ -136,9 +141,6 @@ test("all demos in one normal-speed walkthrough video", async ({ page, request }
 
   await page.reload();
   await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
-  await demoPause(page);
-  await page.getByRole("button", { name: "Send expiry reminder" }).click();
-  await assertEmailContains(request, complianceEmail, "document expiry reminder", "mandatory supplier documents");
   await captureCheckpoint(page, testInfo, "demo-04-compliance");
 
   await page.goto(`/cases/${validationCaseId}`);

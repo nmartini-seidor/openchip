@@ -48,13 +48,13 @@ export function VatInput({ label, inputId, inputName }: VatInputProps) {
               setValidatedValue(null);
             }
           }}
-          className="h-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
+          className="oc-input"
         />
         <button
           type="button"
           disabled={!isValidPattern}
           onClick={() => setValidatedValue(value.trim().toUpperCase())}
-          className="inline-flex h-10 items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-muted)] disabled:opacity-50"
+          className="oc-btn oc-btn-secondary"
         >
           {t("validate")}
         </button>

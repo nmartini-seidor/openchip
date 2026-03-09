@@ -8,6 +8,7 @@ const baseDocument: DocumentSubmission = {
   status: "pending_validation",
   version: 1,
   uploadedAt: new Date().toISOString(),
+  files: [],
   approver: null,
   validationDate: null,
   validFrom: null,

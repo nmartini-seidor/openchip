@@ -46,10 +46,10 @@ export async function StatusTimeline({
           ) : (
             <li
               key={`action-${item.entry.changedAt}-${item.entry.actionType}`}
-              className="rounded-lg border border-blue-200 bg-blue-50 p-3"
+              className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3"
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="inline-flex rounded-md border border-blue-300 bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-800">
+                <span className="inline-flex rounded-md border border-[var(--border-strong)] bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--primary)]">
                   {t(`action.${item.entry.actionType}`)}
                 </span>
                 <time className="text-xs text-slate-500">{formatDateTime(item.entry.changedAt)}</time>

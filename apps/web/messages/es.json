@@ -156,6 +156,8 @@
       "subtitle": "Matriz de requisitos y decisiones de validación",
       "requirement": "Requisito",
       "status": "Estado",
+      "files": "Archivos",
+      "validTo": "Válido hasta",
       "approver": "Aprobador",
       "action": "Acción",
       "approve": "Aprobar",
@@ -164,6 +166,9 @@
       "defaultComment": "Validado",
       "apply": "Aplicar",
       "applying": "Aplicando...",
+      "setExpiry": "Guardar fecha",
+      "settingExpiry": "Guardando...",
+      "noFiles": "Sin archivos",
       "noAction": "Sin acción disponible"
     },
     "compliance": {
@@ -171,6 +176,9 @@
       "poBlock": "Bloqueo de pedido",
       "enabled": "Activado",
       "disabled": "Desactivado",
+      "supplierValidity": "Validez proveedor",
+      "valid": "Válido",
+      "invalidSince": "Inválido desde {date}",
       "mandatoryPending": "Obligatorios pendientes",
       "mandatoryExpired": "Obligatorios vencidos"
     },
@@ -187,6 +195,14 @@
       "requestedBySapUser": "Usuario solicitante SAP",
       "createdBy": "Creado por",
       "contact": "Contacto",
+      "supplierCountry": "País proveedor",
+      "bankCountry": "País banco",
+      "bankKey": "Clave banco",
+      "iban": "IBAN",
+      "bankAccountNumber": "Número de cuenta",
+      "bankControlKey": "Dígito control",
+      "bankAccountName": "Titular de la cuenta",
+      "bankValidity": "Vigencia bancaria",
       "created": "Creado"
     }
   },
@@ -326,10 +342,27 @@
     "submitted": "Respuesta enviada. El equipo interno continuará el proceso.",
     "address": "Dirección",
     "country": "País",
+    "countryPlaceholder": "Selecciona un país",
+    "bankSectionTitle": "Datos bancarios",
+    "bankSectionSubtitle": "Si se informa IBAN, el número de cuenta puede omitirse.",
+    "banks": "Clave país/región banco (BANKS)",
+    "bankl": "Clave banco (BANKL)",
+    "bankn": "Número de cuenta bancaria (BANKN)",
+    "bkont": "Clave de control (BKONT)",
+    "accname": "Titular de la cuenta bancaria",
+    "bkValidFrom": "Inicio de vigencia bancaria",
+    "bkValidTo": "Fin de vigencia bancaria",
+    "iban": "IBAN",
     "submit": "Enviar respuesta",
     "submitting": "Enviando...",
     "requiredDocsTitle": "Documentación requerida",
-    "requiredDocsSubtitle": "Documentos solicitados por categoría"
+    "requiredDocsSubtitle": "Sube uno o varios archivos por requisito",
+    "errors": {
+      "validation": "Revisa los datos y archivos. Los requisitos obligatorios deben incluir al menos un archivo.",
+      "missingMandatoryDocuments": "Faltan archivos en uno o más requisitos obligatorios.",
+      "expired": "Este enlace de proveedor ha caducado.",
+      "notFound": "Este caso de proveedor ya no está disponible."
+    }
   },
   "NotFound": {
     "title": "Recurso no encontrado",

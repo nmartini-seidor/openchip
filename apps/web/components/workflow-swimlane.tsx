@@ -75,18 +75,18 @@ export async function WorkflowSwimlane({
                 <div
                 className={clsx(
                   "flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border px-2 py-1.5",
-                    isActive && "border-blue-400 bg-blue-50 shadow-[0_0_0_2px_rgba(59,130,246,0.2)]",
-                    isCompleted && !isActive && "border-emerald-300 bg-emerald-50",
+                    isActive && "border-[var(--border-strong)] bg-[var(--primary-soft)] shadow-[0_0_0_2px_rgba(37,99,235,0.16)]",
+                    isCompleted && !isActive && "border-[var(--border)] bg-[var(--surface-muted)]",
                     isPending && "border-[var(--border)] bg-[var(--surface-muted)]"
                   )}
                 >
-                  <p className={clsx("truncate text-xs font-semibold", isActive ? "text-blue-700" : "text-slate-700")} title={t(step.labelKey)}>{t(step.labelKey)}</p>
+                  <p className={clsx("truncate text-xs font-semibold", isActive ? "text-[var(--primary)]" : "text-slate-700")} title={t(step.labelKey)}>{t(step.labelKey)}</p>
                   <p className="mt-0.5 flex min-w-0 items-center gap-x-1 truncate text-[10px] text-slate-500">
                     <span
                       className={clsx(
                         "shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.04em]",
-                        isActive && "bg-blue-600 text-white",
-                        isCompleted && !isActive && "bg-emerald-600 text-white",
+                        isActive && "bg-[var(--primary)] text-white",
+                        isCompleted && !isActive && "bg-[var(--primary)] text-white",
                         isPending && "bg-slate-200 text-slate-600"
                       )}
                     >
@@ -105,7 +105,7 @@ export async function WorkflowSwimlane({
                   viewBox="0 0 20 20"
                   className={clsx(
                     "h-3 w-3 shrink-0",
-                    activeIndex > index ? "text-emerald-500" : activeIndex === index ? "text-blue-500" : "text-slate-400"
+                    activeIndex >= index ? "text-[var(--primary)]" : "text-slate-400"
                   )}
                   fill="none"
                   stroke="currentColor"

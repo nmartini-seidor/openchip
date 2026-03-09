@@ -215,17 +215,45 @@ export interface SlaSnapshot {
   onboardingCompletionDays: number;
 }
 
+export interface UploadedDocumentFile {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  storagePath: string;
+  uploadedAt: string;
+  uploadedBy: string;
+}
+
 export interface DocumentSubmission {
   code: DocumentCode;
   requirementLevel: RequirementLevel;
   status: DocumentValidationStatus;
   version: number;
   uploadedAt: string | null;
+  files: UploadedDocumentFile[];
   approver: string | null;
   validationDate: string | null;
   validFrom: string | null;
   validTo: string | null;
   comments: string | null;
+}
+
+export interface SupplierBankAccount {
+  bkvid: string;
+  banks: string;
+  bankl: string;
+  bankn: string | null;
+  bkont: string | null;
+  accname: string;
+  bkValidFrom: string;
+  bkValidTo: string;
+  iban: string | null;
+}
+
+export interface UploadedDocumentInput {
+  code: DocumentCode;
+  files: UploadedDocumentFile[];
 }
 
 export interface OnboardingCase {
@@ -252,6 +280,7 @@ export interface OnboardingCase {
   slaSnapshot: SlaSnapshot;
   supplierAddress: string | null;
   supplierCountry: string | null;
+  supplierBankAccount: SupplierBankAccount | null;
   createdAt: string;
   updatedAt: string;
   statusHistory: StatusHistoryEntry[];
@@ -341,6 +370,8 @@ export interface SupplierSubmissionInput {
   token: string;
   address: string;
   country: string;
+  bankAccount: SupplierBankAccount;
+  uploadedDocuments: UploadedDocumentInput[];
 }
 
 export interface ValidateDocumentInput {

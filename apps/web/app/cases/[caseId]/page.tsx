@@ -10,6 +10,7 @@ import {
   resubmitRejectedDocumentsAction,
   sendExpiryReminderAction,
   sendInvitationAction,
+  setDocumentExpiryAction,
   validateDocumentAction
 } from "@/app/actions";
 import { CaseToastHandler } from "@/components/case-toast-handler";
@@ -26,6 +27,21 @@ import { countdownBadgeClass, getCountdown } from "@/lib/sla";
 
 function getAppBaseUrl(): string {
   return process.env.APP_BASE_URL ?? "http://127.0.0.1:3005";
+}
+
+function getSupplierInvalidSince(documents: { requirementLevel: string; validTo: string | null }[]): string | null {
+  const now = Date.now();
+  const expiredMandatoryDates = documents
+    .filter((document) => document.requirementLevel === "mandatory" && document.validTo !== null)
+    .map((document) => new Date(document.validTo ?? "").getTime())
+    .filter((timestamp) => Number.isFinite(timestamp) && timestamp <= now)
+    .sort((left, right) => left - right);
+
+  if (expiredMandatoryDates.length === 0) {
+    return null;
+  }
+
+  return new Date(expiredMandatoryDates[0] ?? now).toISOString();
 }
 
 export default async function CaseDetailsPage({
@@ -57,6 +73,7 @@ export default async function CaseDetailsPage({
       : await onboardingRepository.getRequirementSummary(onboardingCase.categoryCode);
 
   const complianceResult = evaluateCompliance(onboardingCase.documents);
+  const supplierInvalidSince = getSupplierInvalidSince(onboardingCase.documents);
   const hasRejectedDocuments = onboardingCase.documents.some((document) => document.status === "rejected");
   const hasInvitation = onboardingCase.invitationSentAt !== null;
   const canSendInvitation = onboardingCase.status === "onboarding_initiated";
@@ -128,6 +145,25 @@ export default async function CaseDetailsPage({
     { label: tCase("metadata.createdBy"), value: onboardingCase.createdBy },
     { label: tCase("metadata.contact"), value: onboardingCase.supplierContactName },
     { label: "Email", value: onboardingCase.supplierContactEmail, href: `mailto:${onboardingCase.supplierContactEmail}` },
+    onboardingCase.supplierCountry !== null ? { label: tCase("metadata.supplierCountry"), value: onboardingCase.supplierCountry } : null,
+    onboardingCase.supplierBankAccount !== null ? { label: tCase("metadata.bankCountry"), value: onboardingCase.supplierBankAccount.banks } : null,
+    onboardingCase.supplierBankAccount !== null ? { label: tCase("metadata.bankKey"), value: onboardingCase.supplierBankAccount.bankl } : null,
+    onboardingCase.supplierBankAccount?.iban !== null && onboardingCase.supplierBankAccount?.iban !== undefined
+      ? { label: tCase("metadata.iban"), value: onboardingCase.supplierBankAccount.iban }
+      : null,
+    onboardingCase.supplierBankAccount?.bankn !== null && onboardingCase.supplierBankAccount?.bankn !== undefined
+      ? { label: tCase("metadata.bankAccountNumber"), value: onboardingCase.supplierBankAccount.bankn }
+      : null,
+    onboardingCase.supplierBankAccount?.bkont !== null && onboardingCase.supplierBankAccount?.bkont !== undefined
+      ? { label: tCase("metadata.bankControlKey"), value: onboardingCase.supplierBankAccount.bkont }
+      : null,
+    onboardingCase.supplierBankAccount !== null ? { label: tCase("metadata.bankAccountName"), value: onboardingCase.supplierBankAccount.accname } : null,
+    onboardingCase.supplierBankAccount !== null
+      ? {
+          label: tCase("metadata.bankValidity"),
+          value: `${onboardingCase.supplierBankAccount.bkValidFrom} - ${onboardingCase.supplierBankAccount.bkValidTo}`
+        }
+      : null,
     { label: tCase("metadata.created"), value: formatDateTime(onboardingCase.createdAt) },
     onboardingCase.sourceReference !== null
       ? { label: tCase("metadata.sourceReference"), value: onboardingCase.sourceReference }
@@ -167,7 +203,7 @@ export default async function CaseDetailsPage({
                   </span>
                 }
                 pendingLabel={tCase("controls.sendingInvitation")}
-                className="inline-flex cursor-pointer items-center rounded-md bg-[var(--primary)] px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-[var(--primary-strong)] disabled:opacity-60"
+                className="oc-btn oc-btn-primary oc-btn-compact disabled:opacity-60"
               />
             </form>
           ) : null}
@@ -185,7 +221,7 @@ export default async function CaseDetailsPage({
                   </span>
                 }
                 pendingLabel={tCase("controls.sendingReminder")}
-                className="inline-flex cursor-pointer items-center rounded-md bg-[var(--primary)] px-2.5 py-1.5 text-sm font-semibold text-white hover:bg-[var(--primary-strong)] disabled:opacity-60"
+                className="oc-btn oc-btn-primary oc-btn-compact disabled:opacity-60"
               />
             </form>
           ) : null}
@@ -209,7 +245,7 @@ export default async function CaseDetailsPage({
       <WorkflowSwimlane status={onboardingCase.status} statusHistory={onboardingCase.statusHistory} />
 
       <div className="grid gap-5 xl:grid-cols-[2.2fr_1fr]">
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           {(canCompleteValidation || canCreateSupplierInSap || canResubmitRejected) ? (
             <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="flex flex-wrap items-center gap-2">
@@ -219,7 +255,7 @@ export default async function CaseDetailsPage({
                     <SubmitButton
                       label={tCase("controls.resubmitRejected")}
                       pendingLabel={tCase("controls.resubmittingRejected")}
-                      className="inline-flex cursor-pointer items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-[var(--surface-muted)] disabled:opacity-60"
+                      className="oc-btn oc-btn-secondary disabled:opacity-60"
                     />
                   </form>
                 ) : null}
@@ -230,7 +266,7 @@ export default async function CaseDetailsPage({
                     <SubmitButton
                       label={tCase("controls.completeValidation")}
                       pendingLabel={tCase("controls.completingValidation")}
-                      className="inline-flex cursor-pointer items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-[var(--surface-muted)] disabled:opacity-60"
+                      className="oc-btn oc-btn-secondary disabled:opacity-60"
                     />
                   </form>
                 ) : null}
@@ -241,7 +277,7 @@ export default async function CaseDetailsPage({
                     <SubmitButton
                       label={tCase("controls.createSupplierInSap")}
                       pendingLabel={tCase("controls.creatingSupplierInSap")}
-                      className="inline-flex cursor-pointer items-center rounded-md bg-[var(--success)] px-3 py-2 text-sm font-semibold text-white hover:brightness-95 disabled:opacity-60"
+                      className="oc-btn oc-btn-primary disabled:opacity-60"
                     />
                   </form>
                 ) : null}
@@ -253,14 +289,26 @@ export default async function CaseDetailsPage({
             title={tCase("requirements.title")}
             subtitle={tCase("requirements.subtitle")}
             headerAction={
-              <span className="text-sm text-slate-600">
-                {tCase("compliance.poBlock")}:{" "}
-                {complianceResult.blocked ? (
-                  <span className="font-semibold text-[var(--danger)]">{tCase("compliance.enabled")}</span>
-                ) : (
-                  <span className="font-semibold text-[var(--success)]">{tCase("compliance.disabled")}</span>
-                )}
-              </span>
+              <div className="text-right text-sm text-slate-600">
+                <p>
+                  {tCase("compliance.poBlock")}:{" "}
+                  {complianceResult.blocked ? (
+                    <span className="font-semibold text-[var(--danger)]">{tCase("compliance.enabled")}</span>
+                  ) : (
+                    <span className="font-semibold text-[var(--success)]">{tCase("compliance.disabled")}</span>
+                  )}
+                </p>
+                <p className="mt-1">
+                  {tCase("compliance.supplierValidity")}:{" "}
+                  {supplierInvalidSince === null ? (
+                    <span className="font-semibold text-[var(--success)]">{tCase("compliance.valid")}</span>
+                  ) : (
+                    <span className="font-semibold text-[var(--danger)]">
+                      {tCase("compliance.invalidSince", { date: formatDateTime(supplierInvalidSince) })}
+                    </span>
+                  )}
+                </p>
+              </div>
             }
           >
             <div className="overflow-x-auto">
@@ -270,6 +318,8 @@ export default async function CaseDetailsPage({
                     <th className="py-2 pr-3">Code</th>
                     <th className="py-2 pr-3">{tCase("requirements.requirement")}</th>
                     <th className="py-2 pr-3">{tCase("requirements.status")}</th>
+                    <th className="py-2 pr-3">{tCase("requirements.files")}</th>
+                    <th className="py-2 pr-3">{tCase("requirements.validTo")}</th>
                     <th className="py-2 pr-3">{tCase("requirements.approver")}</th>
                     <th className="py-2 pr-3">{tCase("requirements.action")}</th>
                   </tr>
@@ -291,9 +341,45 @@ export default async function CaseDetailsPage({
                       <td className="py-2 pr-3 whitespace-nowrap capitalize text-slate-700">
                         {documentStatusLabels[document.status] ?? documentStatusLabels.approved_provisionally}
                       </td>
+                      <td className="py-2 pr-3">
+                        {document.files.length > 0 ? (
+                          <ul className="space-y-1 text-xs">
+                            {document.files.map((file) => (
+                              <li key={file.id}>
+                                <a
+                                  href={`/api/cases/${onboardingCase.id}/documents/${document.code}/files/${file.id}`}
+                                  className="cursor-pointer text-[var(--primary)] hover:text-[var(--primary-strong)] hover:underline"
+                                >
+                                  {file.fileName}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-xs text-slate-500">{tCase("requirements.noFiles")}</span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-3">
+                        <form action={setDocumentExpiryAction} className="flex items-center gap-2">
+                          <input type="hidden" name="caseId" value={onboardingCase.id} />
+                          <input type="hidden" name="code" value={document.code} />
+                          <input
+                            type="date"
+                            name="validTo"
+                            defaultValue={document.validTo !== null ? document.validTo.slice(0, 10) : ""}
+                            className="oc-input oc-input-compact"
+                            aria-label={`Expiry for ${document.code}`}
+                          />
+                          <SubmitButton
+                            label={tCase("requirements.setExpiry")}
+                            pendingLabel={tCase("requirements.settingExpiry")}
+                            className="oc-btn oc-btn-secondary oc-btn-compact disabled:opacity-60"
+                          />
+                        </form>
+                      </td>
                       <td className="py-2 pr-3 text-slate-600">{document.approver ?? "-"}</td>
                       <td className="py-2 pr-3">
-                        {onboardingCase.status === "submission_completed" ? (
+                        {onboardingCase.status === "submission_completed" && document.files.length > 0 ? (
                           <form action={validateDocumentAction} className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
                             <input type="hidden" name="caseId" value={onboardingCase.id} />
                             <input type="hidden" name="code" value={document.code} />
@@ -301,7 +387,7 @@ export default async function CaseDetailsPage({
                               name="decision"
                               defaultValue="approve"
                               aria-label={`Validation decision for ${document.code}`}
-                              className="oc-select rounded-md border border-[var(--border)] px-2 py-1 pr-8 text-xs lg:w-44"
+                              className="oc-input oc-input-compact oc-select lg:w-44"
                             >
                               <option value="approve">{tCase("requirements.approve")}</option>
                               <option value="reject">{tCase("requirements.reject")}</option>
@@ -311,12 +397,12 @@ export default async function CaseDetailsPage({
                               name="comments"
                               defaultValue={tCase("requirements.defaultComment")}
                               aria-label={`Validation comments for ${document.code}`}
-                              className="min-w-0 rounded-md border border-[var(--border)] px-2 py-1 text-xs lg:w-56"
+                              className="oc-input oc-input-compact min-w-0 lg:w-56"
                             />
                             <SubmitButton
                               label={tCase("requirements.apply")}
                               pendingLabel={tCase("requirements.applying")}
-                              className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-[var(--surface-muted)] disabled:opacity-60"
+                              className="oc-btn oc-btn-secondary oc-btn-compact disabled:opacity-60"
                             />
                           </form>
                         ) : (
@@ -336,7 +422,7 @@ export default async function CaseDetailsPage({
                     label={tCase("controls.approveAllMandatory")}
                     pendingLabel={tCase("controls.approvingMandatory")}
                     disabled={!canApproveAllMandatory}
-                    className="inline-flex cursor-pointer items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-[var(--surface-muted)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="oc-btn oc-btn-secondary disabled:cursor-not-allowed disabled:opacity-50"
                   />
                 </form>
               </div>
@@ -345,7 +431,7 @@ export default async function CaseDetailsPage({
 
           {canCancelCase ? (
             <details className="group">
-              <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-[var(--danger)] hover:bg-rose-100">
+              <summary className="oc-btn oc-btn-danger list-none">
                 <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
                   <path d="M6 6 14 14M14 6l-8 8" />
                 </svg>
@@ -362,18 +448,18 @@ export default async function CaseDetailsPage({
                   required
                   defaultValue={tCase("controls.defaultCancellationReason")}
                   rows={3}
-                  className="rounded-md border border-[var(--border)] px-3 py-2 text-sm text-slate-900"
+                  className="oc-input min-h-[5.5rem] py-2"
                   aria-label={tCase("controls.cancellationReason")}
                 />
                 <div className="flex flex-wrap items-center gap-2">
                   <SubmitButton
                     label={tCase("controls.cancelCase")}
                     pendingLabel={tCase("controls.cancellingCase")}
-                    className="inline-flex cursor-pointer items-center justify-center rounded-md border border-rose-200 bg-rose-100 px-3 py-2 text-sm font-semibold text-[var(--danger)] hover:bg-rose-200 disabled:opacity-60"
+                    className="oc-btn oc-btn-danger disabled:opacity-60"
                   />
                   <Link
                     href={`/cases/${onboardingCase.id}`}
-                    className="inline-flex cursor-pointer items-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-muted)]"
+                    className="oc-btn oc-btn-secondary"
                   >
                     {tCase("controls.goBack")}
                   </Link>
@@ -383,14 +469,14 @@ export default async function CaseDetailsPage({
           ) : null}
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <section className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.35)]">
             <header className="mb-4 flex items-center justify-between gap-2">
               <h2 className="text-lg font-semibold text-slate-900">{tCase("metadata.title")}</h2>
               <span
                 className={
                   onboardingCase.sourceChannel === "sap_pr"
-                    ? "inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-700"
+                    ? "inline-flex rounded-full border border-[var(--border-strong)] bg-[var(--primary-soft)] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--primary)]"
                     : "inline-flex rounded-full border border-slate-300 bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-slate-700"
                 }
               >

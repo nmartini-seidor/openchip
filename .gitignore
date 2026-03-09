@@ -6,6 +6,8 @@ coverage
 playwright-report
 test-results
 output/playwright
+output/supplier-uploads
+apps/web/output
 .env
 .env.*
 !.env.example

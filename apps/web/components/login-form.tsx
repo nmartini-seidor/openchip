@@ -64,7 +64,7 @@ export function LoginForm({ initialLocale, nextPath, errorCode, messages }: Logi
             type="email"
             autoComplete="email"
             placeholder="finance@openchip.local"
-            className="h-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
+            className="oc-input"
           />
         </div>
 
@@ -77,7 +77,7 @@ export function LoginForm({ initialLocale, nextPath, errorCode, messages }: Logi
             name="locale"
             value={locale}
             onChange={(event) => setLocale(event.target.value === "es" ? "es" : "en")}
-            className="oc-select h-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
+            className="oc-input oc-select"
           >
             <option value="en">{dict.locale.english}</option>
             <option value="es">{dict.locale.spanish}</option>
@@ -90,7 +90,7 @@ export function LoginForm({ initialLocale, nextPath, errorCode, messages }: Logi
 
         <button
           type="submit"
-          className="inline-flex cursor-pointer items-center justify-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
+          className="oc-btn oc-btn-primary w-full"
         >
           {dict.signIn}
         </button>

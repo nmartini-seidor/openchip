@@ -1,23 +1,26 @@
+@import url("https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
-  --background: #f4f6f8;
-  --foreground: #0f172a;
+  --background: #f8fafc;
+  --foreground: #1e293b;
   --text-muted: #475569;
   --surface: #ffffff;
   --surface-muted: #f8fafc;
-  --surface-subtle: #eef2f6;
+  --surface-subtle: #e2e8f0;
   --border: #cbd5e1;
-  --border-strong: #94a3b8;
-  --primary: #243b5a;
-  --primary-strong: #1a2d46;
-  --primary-soft: #e9eef5;
-  --success: #2f6b4f;
-  --warning: #8a6a2a;
-  --danger: #8b3232;
-  --ring: #314d71;
-  --font-heading: "IBM Plex Sans", sans-serif;
-  --font-body: "Public Sans", sans-serif;
+  --border-strong: #2563eb;
+  --primary: #2563eb;
+  --primary-strong: #1d4ed8;
+  --primary-soft: #dbeafe;
+  --cta: #f97316;
+  --cta-strong: #ea580c;
+  --success: #166534;
+  --warning: #b45309;
+  --danger: #b91c1c;
+  --ring: #2563eb;
+  --font-heading: "Lexend", sans-serif;
+  --font-body: "Source Sans 3", sans-serif;
 }
 
 @theme inline {
@@ -74,6 +77,58 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.oc-btn {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.oc-btn-compact {
+  min-height: 2rem;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+}
+
+.oc-btn-primary {
+  background: var(--cta);
+  color: white;
+}
+
+.oc-btn-primary:hover {
+  background: var(--cta-strong);
+}
+
+.oc-btn-secondary {
+  border: 1px solid var(--primary);
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.oc-btn-secondary:hover {
+  background: var(--primary-soft);
+}
+
+.oc-btn-danger {
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: var(--danger);
+}
+
+.oc-btn-danger:hover {
+  background: #fee2e2;
+}
+
 .oc-select {
   appearance: none;
   -webkit-appearance: none;
@@ -83,6 +138,31 @@ button:disabled {
   background-position: right 0.65rem center;
   background-size: 0.72rem;
   padding-right: 2rem;
+}
+
+.oc-input {
+  width: 100%;
+  max-width: 100%;
+  min-height: 2.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  padding: 0.5rem 0.75rem;
+  color: var(--foreground);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.oc-input::placeholder {
+  color: #64748b;
+}
+
+.oc-input-compact {
+  min-height: 2rem;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1rem;
 }
 
 :focus-visible {

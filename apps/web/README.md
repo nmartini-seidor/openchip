@@ -36,7 +36,10 @@ Behavior:
 ### Services (Docker Compose)
 
 - Web: `http://localhost:3000`
-- Postgres: `localhost:5432`
+- Supabase DB (Postgres): `localhost:5432`
+- Supabase Storage API: `http://localhost:5500`
+- MinIO S3 API: `http://localhost:5600`
+- MinIO Console: `http://localhost:5601`
 - Mailpit UI: `http://localhost:8025`
 - SMTP: `localhost:1025`
 
@@ -60,10 +63,17 @@ The app uses mock login by email (no password).
 
 - Host: `localhost`
 - Port: `5432`
-- Database: `openchip`
-- User: `openchip`
+- Database: `postgres`
+- User: `postgres`
 - Password: `openchip`
-- URL: `postgresql://openchip:openchip@localhost:5432/openchip`
+- URL: `postgresql://postgres:openchip@localhost:5432/postgres`
+
+### Supabase Storage Credentials
+
+- Storage API URL: `http://localhost:5500`
+- Bucket: `openchip-documents`
+- Service role key: from `docker-compose.yml` (`SUPABASE_STORAGE_SERVICE_KEY`)
+- Backing object storage: MinIO (`minio` / `minio123`)
 
 ### Mail / SMTP
 

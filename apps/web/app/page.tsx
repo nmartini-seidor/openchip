@@ -74,7 +74,7 @@ export default async function HomePage({
           <div className="grid gap-2">
             <Link
               href="/cases/new"
-              className="inline-flex cursor-pointer items-center justify-center rounded-md bg-[var(--primary)] px-3 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
+              className="oc-btn oc-btn-primary"
             >
               {tHome("quickActions.createCase")}
             </Link>
@@ -89,7 +89,7 @@ export default async function HomePage({
         <div className="mb-3 flex flex-wrap gap-2">
           <Link
             href="/"
-            className={`inline-flex cursor-pointer items-center rounded-md border px-3 py-1.5 text-xs font-semibold ${
+            className={`oc-btn oc-btn-compact ${
               sourceFilter === "all"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
                 : "border-[var(--border)] bg-[var(--surface)] text-slate-600 hover:bg-[var(--surface-muted)]"
@@ -99,7 +99,7 @@ export default async function HomePage({
           </Link>
           <Link
             href="/?source=sap_pr"
-            className={`inline-flex cursor-pointer items-center rounded-md border px-3 py-1.5 text-xs font-semibold ${
+            className={`oc-btn oc-btn-compact ${
               sourceFilter === "sap_pr"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
                 : "border-[var(--border)] bg-[var(--surface)] text-slate-600 hover:bg-[var(--surface-muted)]"
@@ -109,7 +109,7 @@ export default async function HomePage({
           </Link>
           <Link
             href="/?source=manual"
-            className={`inline-flex cursor-pointer items-center rounded-md border px-3 py-1.5 text-xs font-semibold ${
+            className={`oc-btn oc-btn-compact ${
               sourceFilter === "manual"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
                 : "border-[var(--border)] bg-[var(--surface)] text-slate-600 hover:bg-[var(--surface-muted)]"
@@ -188,7 +188,7 @@ export default async function HomePage({
                       <td className="py-3 pr-3">
                         <Link
                           href={`/cases/${onboardingCase.id}`}
-                          className="inline-flex cursor-pointer items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-[var(--surface-muted)]"
+                          className="oc-btn oc-btn-secondary oc-btn-compact"
                         >
                           {tHome("cases.table.openCase")}
                         </Link>

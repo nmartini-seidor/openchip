@@ -156,6 +156,8 @@
       "subtitle": "Requirement matrix and validation decisions",
       "requirement": "Requirement",
       "status": "Status",
+      "files": "Files",
+      "validTo": "Valid to",
       "approver": "Approver",
       "action": "Action",
       "approve": "Approve",
@@ -164,6 +166,9 @@
       "defaultComment": "Validated",
       "apply": "Apply",
       "applying": "Applying...",
+      "setExpiry": "Set expiry",
+      "settingExpiry": "Saving...",
+      "noFiles": "No files",
       "noAction": "No action available"
     },
     "compliance": {
@@ -171,6 +176,9 @@
       "poBlock": "PO Block",
       "enabled": "Enabled",
       "disabled": "Disabled",
+      "supplierValidity": "Supplier validity",
+      "valid": "Valid",
+      "invalidSince": "Invalid since {date}",
       "mandatoryPending": "Mandatory pending",
       "mandatoryExpired": "Mandatory expired"
     },
@@ -187,6 +195,14 @@
       "requestedBySapUser": "SAP requester user",
       "createdBy": "Created by",
       "contact": "Contact",
+      "supplierCountry": "Supplier country",
+      "bankCountry": "Bank country",
+      "bankKey": "Bank key",
+      "iban": "IBAN",
+      "bankAccountNumber": "Bank account number",
+      "bankControlKey": "Bank control key",
+      "bankAccountName": "Bank account name",
+      "bankValidity": "Bank validity",
       "created": "Created"
     }
   },
@@ -326,10 +342,27 @@
     "submitted": "Response submitted. Internal team will continue the process.",
     "address": "Address",
     "country": "Country",
+    "countryPlaceholder": "Select a country",
+    "bankSectionTitle": "Bank account details",
+    "bankSectionSubtitle": "If IBAN is provided, bank account number can be omitted.",
+    "banks": "Bank country/region key (BANKS)",
+    "bankl": "Bank key (BANKL)",
+    "bankn": "Bank account number (BANKN)",
+    "bkont": "Bank control key (BKONT)",
+    "accname": "Bank account holder name",
+    "bkValidFrom": "Bank validity start",
+    "bkValidTo": "Bank validity end",
+    "iban": "IBAN",
     "submit": "Submit supplier response",
     "submitting": "Submitting...",
     "requiredDocsTitle": "Required documentation",
-    "requiredDocsSubtitle": "Documents requested for your category"
+    "requiredDocsSubtitle": "Upload one or more files per requirement",
+    "errors": {
+      "validation": "Review your data and uploads. Mandatory requirements must include at least one file.",
+      "missingMandatoryDocuments": "Missing files for one or more mandatory requirements.",
+      "expired": "This supplier link has expired.",
+      "notFound": "This supplier case is no longer available."
+    }
   },
   "NotFound": {
     "title": "Resource not found",

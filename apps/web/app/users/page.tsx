@@ -37,7 +37,7 @@ export default async function UsersPage() {
                   id={`displayName-${user.id}`}
                   name="displayName"
                   defaultValue={user.displayName}
-                  className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                  className="oc-input"
                 />
                 <input type="hidden" name="email" value={user.email} />
                 <p className="text-xs text-slate-500">{user.email}</p>
@@ -51,7 +51,7 @@ export default async function UsersPage() {
                   id={`role-${user.id}`}
                   name="role"
                   defaultValue={user.role}
-                  className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                  className="oc-input oc-select"
                 >
                   {internalRoles.map((role) => (
                     <option key={role} value={role}>
@@ -69,7 +69,7 @@ export default async function UsersPage() {
                   id={`active-${user.id}`}
                   name="active"
                   defaultValue={user.active ? "true" : "false"}
-                  className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                  className="oc-input oc-select"
                 >
                   <option value="true">{t("active")}</option>
                   <option value="false">{t("inactive")}</option>
@@ -80,7 +80,7 @@ export default async function UsersPage() {
                 <SubmitButton
                   label={t("save")}
                   pendingLabel={t("saving")}
-                  className="inline-flex w-full items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-subtle)]"
+                  className="oc-btn oc-btn-secondary w-full"
                 />
               </div>
             </form>
@@ -98,7 +98,7 @@ export default async function UsersPage() {
               id="newDisplayName"
               name="displayName"
               required
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+              className="oc-input"
             />
           </div>
 
@@ -111,7 +111,7 @@ export default async function UsersPage() {
               name="email"
               required
               type="email"
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+              className="oc-input"
             />
           </div>
 
@@ -123,7 +123,7 @@ export default async function UsersPage() {
               id="newRole"
               name="role"
               defaultValue="requester"
-              className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+              className="oc-input oc-select"
             >
               {internalRoles.map((role) => (
                 <option key={role} value={role}>
@@ -141,7 +141,7 @@ export default async function UsersPage() {
               id="newActive"
               name="active"
               defaultValue="true"
-              className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+              className="oc-input oc-select"
             >
               <option value="true">{t("active")}</option>
               <option value="false">{t("inactive")}</option>
@@ -152,7 +152,7 @@ export default async function UsersPage() {
             <SubmitButton
               label={t("createUser")}
               pendingLabel={t("creatingUser")}
-              className="inline-flex items-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
+              className="oc-btn oc-btn-primary"
             />
           </div>
         </form>

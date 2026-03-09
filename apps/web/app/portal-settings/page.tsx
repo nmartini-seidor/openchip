@@ -70,7 +70,7 @@ export default async function PortalSettingsPage({
               min={1}
               max={168}
               defaultValue={settings.invitationOpenHours}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
+              className="oc-input"
             />
           </div>
 
@@ -86,7 +86,7 @@ export default async function PortalSettingsPage({
               min={1}
               max={90}
               defaultValue={settings.onboardingCompletionDays}
-              className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
+              className="oc-input"
             />
           </div>
 
@@ -94,7 +94,7 @@ export default async function PortalSettingsPage({
             <SubmitButton
               label={tPortal("saveSettings")}
               pendingLabel={tPortal("savingSettings")}
-              className="inline-flex items-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
+              className="oc-btn oc-btn-primary"
             />
           </div>
         </form>
@@ -119,7 +119,7 @@ export default async function PortalSettingsPage({
                 <SubmitButton
                   label={type.active ? tPortal("supplierTypes.deactivate") : tPortal("supplierTypes.activate")}
                   pendingLabel={tPortal("supplierTypes.saving")}
-                  className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-subtle)]"
+                  className="oc-btn oc-btn-secondary"
                 />
               </div>
             </form>
@@ -135,13 +135,13 @@ export default async function PortalSettingsPage({
                 name="label"
                 required
                 placeholder={tPortal("supplierTypes.newTypePlaceholder")}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                className="oc-input"
               />
             </div>
             <SubmitButton
               label={tPortal("supplierTypes.addType")}
               pendingLabel={tPortal("supplierTypes.addingType")}
-              className="inline-flex items-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
+              className="oc-btn oc-btn-primary"
             />
           </form>
         </div>
@@ -166,7 +166,7 @@ export default async function PortalSettingsPage({
                 <SubmitButton
                   label={category.active ? tPortal("supplierCategories.deactivate") : tPortal("supplierCategories.activate")}
                   pendingLabel={tPortal("supplierCategories.saving")}
-                  className="inline-flex items-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-subtle)]"
+                  className="oc-btn oc-btn-secondary"
                 />
               </div>
             </form>
@@ -182,7 +182,7 @@ export default async function PortalSettingsPage({
                 name="funding"
                 required
                 defaultValue={fundingTypes[0]}
-                className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                className="oc-input oc-select"
               >
                 {fundingTypes.map((funding) => (
                   <option key={funding} value={funding}>
@@ -200,7 +200,7 @@ export default async function PortalSettingsPage({
                 id="categoryType"
                 name="typeId"
                 required
-                className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                className="oc-input oc-select"
               >
                 {activeTypes.map((type) => (
                   <option key={type.id} value={type.id}>
@@ -219,7 +219,7 @@ export default async function PortalSettingsPage({
                 name="location"
                 required
                 defaultValue={locationTypes[0]}
-                className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                className="oc-input oc-select"
               >
                 {locationTypes.map((location) => (
                   <option key={location} value={location}>
@@ -238,7 +238,7 @@ export default async function PortalSettingsPage({
                 name="label"
                 required
                 placeholder={tPortal("supplierCategories.displayLabelPlaceholder")}
-                className="rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                className="oc-input"
               />
             </div>
 
@@ -246,7 +246,7 @@ export default async function PortalSettingsPage({
               <SubmitButton
                 label={tPortal("supplierCategories.addCategory")}
                 pendingLabel={tPortal("supplierCategories.addingCategory")}
-                className="inline-flex items-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)]"
+                className="oc-btn oc-btn-primary"
               />
             </div>
           </form>
@@ -268,7 +268,7 @@ export default async function PortalSettingsPage({
                   name="category"
                   required
                   defaultValue={selectedCategory?.code ?? ""}
-                  className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-slate-900"
+                  className="oc-input oc-select"
                 >
                   {categories.map((category) => (
                     <option key={category.code} value={category.code}>
@@ -279,7 +279,7 @@ export default async function PortalSettingsPage({
               </div>
               <button
                 type="submit"
-                className="inline-flex cursor-pointer items-center justify-center rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-subtle)]"
+                className="oc-btn oc-btn-secondary"
               >
                 {tPortal("requirementMatrix.loadCategory")}
               </button>
@@ -319,7 +319,7 @@ export default async function PortalSettingsPage({
                                   name="requirementLevel"
                                   defaultValue={currentLevel}
                                   aria-label={`Requirement level for ${document.code}`}
-                                  className="oc-select rounded-md border border-[var(--border)] px-2 py-1 pr-8 text-xs"
+                                  className="oc-input oc-input-compact oc-select text-xs"
                                 >
                                   <option value="mandatory">{tCommon("requirementLevel.mandatory")}</option>
                                   <option value="optional">{tCommon("requirementLevel.optional")}</option>
@@ -328,7 +328,7 @@ export default async function PortalSettingsPage({
                                 <SubmitButton
                                   label={tPortal("requirementMatrix.save")}
                                   pendingLabel={tPortal("requirementMatrix.saving")}
-                                  className="rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-[var(--surface-muted)] disabled:opacity-60"
+                                  className="oc-btn oc-btn-secondary oc-btn-compact disabled:opacity-60"
                                 />
                               </form>
                             </td>

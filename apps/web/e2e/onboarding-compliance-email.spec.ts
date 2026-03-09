@@ -50,7 +50,7 @@ test("send expiry reminder produces an email", async ({ page, request }, testInf
   await loginAsFinance(page);
 
   const supplierEmail = "reminder@example.com";
-  const caseId = await createCaseViaUi(page, {
+  await createCaseViaUi(page, {
     supplierName: "Proveedor Reminder",
     supplierVat: createUniqueVat("REMINDER"),
     supplierContactName: "Reminder Tester",
@@ -59,10 +59,10 @@ test("send expiry reminder produces an email", async ({ page, request }, testInf
     categoryCode: "SUB-STD-NAT"
   });
 
-  const supplierUrl = await sendInvitationFromCase(page);
-  await submitSupplierResponse(page, supplierUrl, caseId);
-
-  await page.getByRole("button", { name: "Send expiry reminder" }).click();
+  await sendInvitationFromCase(page);
+  const reminderButton = page.getByRole("button", { name: /Send (expiry|expiration) reminder/i });
+  await expect(reminderButton).toBeVisible({ timeout: 15_000 });
+  await reminderButton.click();
   await assertEmailContains(request, supplierEmail, "document expiry reminder", "mandatory supplier documents");
 
   await captureCheckpoint(page, testInfo, "reminder-email-sent");

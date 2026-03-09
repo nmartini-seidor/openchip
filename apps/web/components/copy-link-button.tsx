@@ -32,13 +32,14 @@ export function CopyLinkButton({ value, label, successLabel, className, icon }: 
   return (
     <button
       type="button"
+      data-link-value={value}
       onClick={async () => {
         await copyToClipboard(value);
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1200);
       }}
       className={[
-        "inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-[var(--surface-muted)]",
+        "oc-btn oc-btn-secondary oc-btn-compact",
         className ?? ""
       ].join(" ")}
     >

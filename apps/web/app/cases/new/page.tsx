@@ -47,9 +47,11 @@ export default async function NewCasePage({ searchParams }: NewCasePageProps) {
       <div className="flex items-center">
         <Link
           href="/"
-          className="inline-flex cursor-pointer items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-[var(--surface-muted)]"
+          className="oc-btn oc-btn-secondary"
         >
-          <span aria-hidden>←</span>
+          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="m12.5 4.5-5 5 5 5" />
+          </svg>
           {t("goBack")}
         </Link>
       </div>
@@ -70,7 +72,7 @@ export default async function NewCasePage({ searchParams }: NewCasePageProps) {
                 </span>
               }
               pendingLabel={t("creatingCase")}
-              className="inline-flex cursor-pointer items-center rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-white hover:bg-[var(--primary-strong)] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="oc-btn oc-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
             />
           }
         >
@@ -78,53 +80,41 @@ export default async function NewCasePage({ searchParams }: NewCasePageProps) {
             <p className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-semibold text-rose-700">{errorMessage}</p>
           ) : null}
           <div className="grid gap-4 lg:grid-cols-2">
-          <div className="grid gap-2 self-start">
-            <label htmlFor="supplierName" className="min-h-[1.5rem] text-sm font-semibold text-slate-700">
-              {t("supplierName")}
-              <span className="text-red-600" aria-hidden> *</span>
-            </label>
-            <input
-              id="supplierName"
-              name="supplierName"
-              required
-              autoComplete="organization"
-              className="h-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
-            />
-          </div>
+            <div className="grid gap-2 self-start">
+              <label htmlFor="supplierName" className="min-h-[1.5rem] text-sm font-semibold text-slate-700">
+                {t("supplierName")}
+                <span className="text-red-600" aria-hidden> *</span>
+              </label>
+              <input id="supplierName" name="supplierName" required autoComplete="organization" className="oc-input" />
+            </div>
 
-          <VatInput label={t("supplierVat")} inputId="supplierVat" inputName="supplierVat" />
+            <VatInput label={t("supplierVat")} inputId="supplierVat" inputName="supplierVat" />
 
-          <div className="grid gap-2">
-            <label htmlFor="supplierContactName" className="text-sm font-semibold text-slate-700">
-              {t("supplierContactName")}
-              <span className="text-red-600" aria-hidden> *</span>
-            </label>
-            <input
-              id="supplierContactName"
-              name="supplierContactName"
-              required
-              autoComplete="name"
-              className="h-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
-            />
-          </div>
-          <div className="grid gap-2">
-            <label htmlFor="supplierContactEmail" className="text-sm font-semibold text-slate-700">
-              {t("supplierContactEmail")}
-              <span className="text-red-600" aria-hidden> *</span>
-            </label>
-            <input
-              id="supplierContactEmail"
-              name="supplierContactEmail"
-              required
-              type="email"
-              autoComplete="email"
-              spellCheck={false}
-              inputMode="email"
-              className="h-10 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
-            />
-          </div>
+            <div className="grid gap-2">
+              <label htmlFor="supplierContactName" className="text-sm font-semibold text-slate-700">
+                {t("supplierContactName")}
+                <span className="text-red-600" aria-hidden> *</span>
+              </label>
+              <input id="supplierContactName" name="supplierContactName" required autoComplete="name" className="oc-input" />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="supplierContactEmail" className="text-sm font-semibold text-slate-700">
+                {t("supplierContactEmail")}
+                <span className="text-red-600" aria-hidden> *</span>
+              </label>
+              <input
+                id="supplierContactEmail"
+                name="supplierContactEmail"
+                required
+                type="email"
+                autoComplete="email"
+                spellCheck={false}
+                inputMode="email"
+                className="oc-input"
+              />
+            </div>
 
-          <CategoryRequirementsSelector categories={categories} previewsByCategory={previewsByCategory} />
+            <CategoryRequirementsSelector categories={categories} previewsByCategory={previewsByCategory} />
           </div>
         </SectionCard>
       </form>

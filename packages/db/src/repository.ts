@@ -13,6 +13,7 @@ import {
   RequirementMatrixEntry,
   RequirementMatrixUpdateInput,
   RequirementPreviewRow,
+  UploadedDocumentFile,
   SupplierCategoryCreateInput,
   SupplierCategoryDefinition,
   SupplierCategoryStatusInput,
@@ -21,6 +22,7 @@ import {
   SupplierCategoryCode,
   SupplierSession,
   SupplierSubmissionInput,
+  SupplierBankAccount,
   SupplierTypeCreateInput,
   SupplierTypeDefinition,
   SupplierTypeStatusInput,
@@ -29,6 +31,7 @@ import {
 } from "@openchip/shared";
 import { evaluateCompliance, transitionCaseStatus } from "@openchip/workflow";
 import { randomUUID } from "node:crypto";
+import { Pool, PoolClient } from "pg";
 import { getSupplierConfigStore, SupplierConfigStore } from "./supplier-config-store";
 
 const INVITATION_TTL_DAYS = 14;
@@ -55,9 +58,13 @@ function cloneCase(onboardingCase: OnboardingCase): OnboardingCase {
   return {
     ...onboardingCase,
     slaSnapshot: { ...onboardingCase.slaSnapshot },
+    supplierBankAccount: onboardingCase.supplierBankAccount === null ? null : { ...onboardingCase.supplierBankAccount },
     statusHistory: onboardingCase.statusHistory.map((entry) => ({ ...entry })),
     actionHistory: (onboardingCase.actionHistory ?? []).map((entry) => ({ ...entry })),
-    documents: onboardingCase.documents.map((document) => ({ ...document }))
+    documents: onboardingCase.documents.map((document) => ({
+      ...document,
+      files: document.files.map((file) => ({ ...file }))
+    }))
   };
 }
 
@@ -69,13 +76,20 @@ function clonePortalSettings(settings: PortalSettings): PortalSettings {
   return { ...settings };
 }
 
-function createDocumentSubmission(code: DocumentCode, requirementLevel: "mandatory" | "optional"): DocumentSubmission {
+function createDocumentSubmission(
+  code: DocumentCode,
+  requirementLevel: "mandatory" | "optional",
+  files: UploadedDocumentFile[]
+): DocumentSubmission {
+  const uploadedAt = files.length > 0 ? files[files.length - 1]?.uploadedAt ?? nowIso() : null;
+
   return {
     code,
     requirementLevel,
-    status: "pending_validation",
+    status: files.length > 0 ? "pending_validation" : "pending_reception",
     version: 1,
-    uploadedAt: nowIso(),
+    uploadedAt,
+    files,
     approver: null,
     validationDate: null,
     validFrom: null,
@@ -91,6 +105,7 @@ function toRequirementSummarySubmission(row: RequirementPreviewRow): DocumentSub
     status: "pending_reception",
     version: 1,
     uploadedAt: null,
+    files: [],
     approver: null,
     validationDate: null,
     validFrom: null,
@@ -115,6 +130,10 @@ function assertCaseExists(onboardingCase: OnboardingCase | undefined, caseId: st
 
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+function cloneBankAccount(bankAccount: SupplierBankAccount): SupplierBankAccount {
+  return { ...bankAccount };
 }
 
 function createDefaultPortalSettings(): PortalSettings {
@@ -194,6 +213,13 @@ interface Store {
   portalSettings: PortalSettings;
 }
 
+interface PersistedStorePayload {
+  cases: OnboardingCase[];
+  integrationEvents: IntegrationEvent[];
+  users: InternalUser[];
+  portalSettings: PortalSettings;
+}
+
 export interface OnboardingRepository {
   listCases(): Promise<OnboardingCase[]>;
   getCase(caseId: string): Promise<OnboardingCase | null>;
@@ -218,7 +244,7 @@ export interface OnboardingRepository {
   resetStore(): Promise<void>;
   forceExpireInvitation(caseId: string): Promise<OnboardingCase>;
   resubmitRejectedDocuments(caseId: string, actor: string): Promise<OnboardingCase>;
-  setDocumentExpiry(caseId: string, code: DocumentCode, validTo: string | null): Promise<OnboardingCase>;
+  setDocumentExpiry(caseId: string, code: DocumentCode, validTo: string | null, actor?: string): Promise<OnboardingCase>;
   listUsers(): Promise<InternalUser[]>;
   getUser(userId: string): Promise<InternalUser | null>;
   getUserByEmail(email: string): Promise<InternalUser | null>;
@@ -349,6 +375,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       },
       supplierAddress: null,
       supplierCountry: null,
+      supplierBankAccount: null,
       createdAt,
       updatedAt: createdAt,
       statusHistory: [
@@ -484,15 +511,31 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
 
     onboardingCase.supplierAddress = input.address;
     onboardingCase.supplierCountry = input.country;
+    onboardingCase.supplierBankAccount = cloneBankAccount(input.bankAccount);
 
     const requirements = await this.supplierConfigStore.listRequirementPreviewRows(onboardingCase.categoryCode);
+    const uploadedDocumentsByCode = new Map<DocumentCode, UploadedDocumentFile[]>();
+    for (const uploadedDocument of input.uploadedDocuments) {
+      const existing = uploadedDocumentsByCode.get(uploadedDocument.code);
+      if (existing === undefined) {
+        uploadedDocumentsByCode.set(uploadedDocument.code, [...uploadedDocument.files]);
+      } else {
+        existing.push(...uploadedDocument.files);
+      }
+    }
+
     const documents: DocumentSubmission[] = [];
     for (const row of requirements) {
       if (!isApplicableRequirement(row.requirementLevel)) {
         continue;
       }
 
-      documents.push(createDocumentSubmission(row.code, row.requirementLevel));
+      const files = uploadedDocumentsByCode.get(row.code) ?? [];
+      if (row.requirementLevel === "mandatory" && files.length === 0) {
+        throw new Error(`Mandatory requirement ${row.code} is missing uploaded files.`);
+      }
+
+      documents.push(createDocumentSubmission(row.code, row.requirementLevel, files));
     }
 
     onboardingCase.documents = documents;
@@ -535,7 +578,6 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     if (input.decision === "reject") {
       document.status = "rejected";
       document.version += 1;
-      document.uploadedAt = null;
       document.validFrom = null;
       document.validTo = null;
     }
@@ -668,6 +710,17 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
         hasRejectedDocument = true;
         document.status = "pending_validation";
         document.uploadedAt = nowIso();
+        if (document.files.length === 0) {
+          document.files.push({
+            id: randomUUID(),
+            fileName: `resubmitted-${document.code.toLowerCase()}-v${document.version + 1}.pdf`,
+            mimeType: "application/pdf",
+            sizeBytes: 1024,
+            storagePath: `/mock-storage/resubmissions/${caseId}/${document.code}/${randomUUID()}.pdf`,
+            uploadedAt: document.uploadedAt,
+            uploadedBy: actor
+          });
+        }
         document.comments = "Supplier uploaded a new version";
       }
     }
@@ -680,7 +733,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     return cloneCase(onboardingCase);
   }
 
-  async setDocumentExpiry(caseId: string, code: DocumentCode, validTo: string | null): Promise<OnboardingCase> {
+  async setDocumentExpiry(caseId: string, code: DocumentCode, validTo: string | null, actor = "test.agent"): Promise<OnboardingCase> {
     const onboardingCase = assertCaseExists(this.store.cases.get(caseId), caseId);
     const document = onboardingCase.documents.find((item) => item.code === code);
 
@@ -690,7 +743,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
 
     document.validTo = validTo;
     onboardingCase.updatedAt = nowIso();
-    this.pushEvent(onboardingCase, "document_expiry_set", "test.agent", {
+    this.pushEvent(onboardingCase, "document_expiry_set", actor, {
       documentCode: code,
       validTo: validTo ?? "null"
     });
@@ -902,11 +955,325 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
   }
 }
 
+const stateRowId = "singleton";
+
+function toPersistedStorePayload(store: Store): PersistedStorePayload {
+  return {
+    cases: [...store.cases.values()],
+    integrationEvents: [...store.integrationEvents],
+    users: [...store.users.values()],
+    portalSettings: store.portalSettings
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function fromPersistedStorePayload(payload: unknown): Store {
+  if (!isRecord(payload)) {
+    return createStore();
+  }
+
+  const rawCases = payload.cases;
+  const rawEvents = payload.integrationEvents;
+  const rawUsers = payload.users;
+  const rawPortalSettings = payload.portalSettings;
+
+  if (!Array.isArray(rawCases) || !Array.isArray(rawEvents) || !Array.isArray(rawUsers) || !isRecord(rawPortalSettings)) {
+    return createStore();
+  }
+
+  const cases = new Map<string, OnboardingCase>();
+  for (const onboardingCase of rawCases) {
+    if (isRecord(onboardingCase) && typeof onboardingCase.id === "string") {
+      cases.set(onboardingCase.id, onboardingCase as unknown as OnboardingCase);
+    }
+  }
+
+  const users = new Map<string, InternalUser>();
+  for (const user of rawUsers) {
+    if (isRecord(user) && typeof user.id === "string") {
+      users.set(user.id, user as unknown as InternalUser);
+    }
+  }
+
+  return {
+    cases,
+    integrationEvents: rawEvents as IntegrationEvent[],
+    users,
+    portalSettings: rawPortalSettings as unknown as PortalSettings
+  };
+}
+
+class PostgresOnboardingRepository implements OnboardingRepository {
+  private initPromise: Promise<void> | null = null;
+
+  constructor(
+    private readonly pool: Pool,
+    private readonly supplierConfigStore: SupplierConfigStore
+  ) {}
+
+  private async ensureInitialized(): Promise<void> {
+    if (this.initPromise !== null) {
+      await this.initPromise;
+      return;
+    }
+
+    this.initPromise = this.initialize();
+    await this.initPromise;
+  }
+
+  private async initialize(): Promise<void> {
+    await this.pool.query(`
+      CREATE TABLE IF NOT EXISTS openchip_onboarding_state (
+        id TEXT PRIMARY KEY,
+        payload JSONB NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL
+      );
+    `);
+
+    const existing = await this.pool.query<{ id: string }>(
+      `SELECT id FROM openchip_onboarding_state WHERE id = $1 LIMIT 1`,
+      [stateRowId]
+    );
+
+    if (existing.rows.length === 0) {
+      await this.pool.query(
+        `
+        INSERT INTO openchip_onboarding_state (id, payload, updated_at)
+        VALUES ($1, $2::jsonb, $3)
+        `,
+        [stateRowId, JSON.stringify(toPersistedStorePayload(createStore())), nowIso()]
+      );
+    }
+  }
+
+  private async loadStore(client: Pool | PoolClient, lockForUpdate: boolean): Promise<Store> {
+    const query = lockForUpdate
+      ? `SELECT payload FROM openchip_onboarding_state WHERE id = $1 FOR UPDATE`
+      : `SELECT payload FROM openchip_onboarding_state WHERE id = $1`;
+
+    const result = await client.query<{ payload: unknown }>(query, [stateRowId]);
+    const payload = result.rows[0]?.payload;
+    return fromPersistedStorePayload(payload);
+  }
+
+  private async persistStore(client: PoolClient, store: Store): Promise<void> {
+    await client.query(
+      `
+      UPDATE openchip_onboarding_state
+      SET payload = $2::jsonb,
+          updated_at = $3
+      WHERE id = $1
+      `,
+      [stateRowId, JSON.stringify(toPersistedStorePayload(store)), nowIso()]
+    );
+  }
+
+  private async withReadStore<T>(callback: (repository: InMemoryOnboardingRepository) => Promise<T>): Promise<T> {
+    await this.ensureInitialized();
+    const store = await this.loadStore(this.pool, false);
+    const repository = new InMemoryOnboardingRepository(store, this.supplierConfigStore);
+    return callback(repository);
+  }
+
+  private async withWriteStore<T>(callback: (repository: InMemoryOnboardingRepository) => Promise<T>): Promise<T> {
+    await this.ensureInitialized();
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const store = await this.loadStore(client, true);
+      const repository = new InMemoryOnboardingRepository(store, this.supplierConfigStore);
+      const result = await callback(repository);
+      await this.persistStore(client, store);
+      await client.query("COMMIT");
+      return result;
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async listCases(): Promise<OnboardingCase[]> {
+    return this.withReadStore((repository) => repository.listCases());
+  }
+
+  async getCase(caseId: string): Promise<OnboardingCase | null> {
+    return this.withReadStore((repository) => repository.getCase(caseId));
+  }
+
+  async getCaseBySourceReference(
+    sourceChannel: CaseSourceChannel,
+    sourceSystem: string,
+    sourceReference: string
+  ): Promise<OnboardingCase | null> {
+    return this.withReadStore((repository) => repository.getCaseBySourceReference(sourceChannel, sourceSystem, sourceReference));
+  }
+
+  async createCase(input: CreateCaseInput, actor?: string, options?: CreateCaseOptions): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.createCase(input, actor, options));
+  }
+
+  async sendInvitation(caseId: string, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.sendInvitation(caseId, actor));
+  }
+
+  async getCaseByInvitationToken(token: string): Promise<OnboardingCase | null> {
+    return this.withReadStore((repository) => repository.getCaseByInvitationToken(token));
+  }
+
+  async getSupplierSession(token: string): Promise<SupplierSession | null> {
+    return this.withReadStore((repository) => repository.getSupplierSession(token));
+  }
+
+  async registerPortalAccess(token: string, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.registerPortalAccess(token, actor));
+  }
+
+  async submitSupplierResponse(input: SupplierSubmissionInput, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.submitSupplierResponse(input, actor));
+  }
+
+  async validateDocument(input: ValidateDocumentInput): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.validateDocument(input));
+  }
+
+  async approveAllMandatoryDocuments(caseId: string, approver: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.approveAllMandatoryDocuments(caseId, approver));
+  }
+
+  async completeValidation(caseId: string, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.completeValidation(caseId, actor));
+  }
+
+  async createSupplierInSap(caseId: string, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.createSupplierInSap(caseId, actor));
+  }
+
+  async cancelCase(caseId: string, actor: string, reason: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.cancelCase(caseId, actor, reason));
+  }
+
+  async listIntegrationEvents(): Promise<IntegrationEvent[]> {
+    return this.withReadStore((repository) => repository.listIntegrationEvents());
+  }
+
+  async getRequirementSummary(categoryCode: SupplierCategoryCode): Promise<DocumentSubmission[]> {
+    return this.withReadStore((repository) => repository.getRequirementSummary(categoryCode));
+  }
+
+  async resetStore(): Promise<void> {
+    await this.withWriteStore((repository) => repository.resetStore());
+  }
+
+  async forceExpireInvitation(caseId: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.forceExpireInvitation(caseId));
+  }
+
+  async resubmitRejectedDocuments(caseId: string, actor: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.resubmitRejectedDocuments(caseId, actor));
+  }
+
+  async setDocumentExpiry(caseId: string, code: DocumentCode, validTo: string | null, actor?: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.setDocumentExpiry(caseId, code, validTo, actor));
+  }
+
+  async listUsers(): Promise<InternalUser[]> {
+    return this.withReadStore((repository) => repository.listUsers());
+  }
+
+  async getUser(userId: string): Promise<InternalUser | null> {
+    return this.withReadStore((repository) => repository.getUser(userId));
+  }
+
+  async getUserByEmail(email: string): Promise<InternalUser | null> {
+    return this.withReadStore((repository) => repository.getUserByEmail(email));
+  }
+
+  async upsertUser(input: UserUpsertInput, actor: string): Promise<InternalUser> {
+    return this.withWriteStore((repository) => repository.upsertUser(input, actor));
+  }
+
+  async getPortalSettings(): Promise<PortalSettings> {
+    return this.withReadStore((repository) => repository.getPortalSettings());
+  }
+
+  async listSupplierTypes(includeInactive?: boolean): Promise<SupplierTypeDefinition[]> {
+    return this.supplierConfigStore.listSupplierTypes(includeInactive);
+  }
+
+  async createSupplierType(input: SupplierTypeCreateInput, actor: string): Promise<SupplierTypeDefinition> {
+    return this.supplierConfigStore.createSupplierType(input, actor);
+  }
+
+  async setSupplierTypeStatus(input: SupplierTypeStatusInput, actor: string): Promise<SupplierTypeDefinition> {
+    return this.supplierConfigStore.setSupplierTypeStatus(input, actor);
+  }
+
+  async listSupplierCategories(includeInactive?: boolean): Promise<SupplierCategoryDefinition[]> {
+    return this.supplierConfigStore.listSupplierCategories(includeInactive);
+  }
+
+  async getSupplierCategory(categoryCode: SupplierCategoryCode): Promise<SupplierCategoryDefinition | null> {
+    return this.supplierConfigStore.getSupplierCategory(categoryCode);
+  }
+
+  async createSupplierCategory(input: SupplierCategoryCreateInput, actor: string): Promise<SupplierCategoryDefinition> {
+    return this.supplierConfigStore.createSupplierCategory(input, actor);
+  }
+
+  async setSupplierCategoryStatus(input: SupplierCategoryStatusInput, actor: string): Promise<SupplierCategoryDefinition> {
+    return this.supplierConfigStore.setSupplierCategoryStatus(input, actor);
+  }
+
+  async listRequirementMatrixEntries(categoryCode: SupplierCategoryCode): Promise<RequirementMatrixEntry[]> {
+    return this.supplierConfigStore.listRequirementMatrixEntries(categoryCode);
+  }
+
+  async updateRequirementMatrixEntry(input: RequirementMatrixUpdateInput, actor: string): Promise<RequirementMatrixEntry> {
+    return this.supplierConfigStore.updateRequirementMatrixEntry(input, actor);
+  }
+
+  async getRequirementPreview(categoryCode: SupplierCategoryCode): Promise<RequirementPreviewRow[]> {
+    return this.supplierConfigStore.listRequirementPreviewRows(categoryCode);
+  }
+
+  async listRequirementPreviewsForActiveCategories(): Promise<Record<string, RequirementPreviewRow[]>> {
+    const categories = await this.supplierConfigStore.listSupplierCategories(false);
+    return this.supplierConfigStore.listRequirementPreviewByCategoryCodes(categories.map((category) => category.code));
+  }
+
+  async updatePortalSettings(
+    input: Pick<PortalSettings, "invitationOpenHours" | "onboardingCompletionDays">,
+    actor: string
+  ): Promise<PortalSettings> {
+    return this.withWriteStore((repository) => repository.updatePortalSettings(input, actor));
+  }
+
+  async recordWorkflowTrigger(
+    caseId: string,
+    actor: string,
+    workflowName: "invitation_open_sla" | "onboarding_completion_sla" | "document_expiry",
+    runId: string | null,
+    mode: "workflow" | "fallback"
+  ): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.recordWorkflowTrigger(caseId, actor, workflowName, runId, mode));
+  }
+
+  async recordCaseAction(caseId: string, actor: string, actionType: CaseActionType, note: string): Promise<OnboardingCase> {
+    return this.withWriteStore((repository) => repository.recordCaseAction(caseId, actor, actionType, note));
+  }
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var __openchipStore: Store | undefined;
   // eslint-disable-next-line no-var
-  var __openchipRepository: InMemoryOnboardingRepository | undefined;
+  var __openchipRepository: OnboardingRepository | undefined;
 }
 
 function createStore(): Store {
@@ -924,16 +1291,26 @@ function createStore(): Store {
 }
 
 export function getOnboardingRepository(): OnboardingRepository {
+  if (globalThis.__openchipRepository !== undefined) {
+    return globalThis.__openchipRepository;
+  }
+
+  const supplierConfigStore = getSupplierConfigStore();
+  const databaseUrl = process.env.DATABASE_URL;
+
+  if (databaseUrl !== undefined && databaseUrl.length > 0) {
+    const pool = new Pool({
+      connectionString: databaseUrl
+    });
+
+    globalThis.__openchipRepository = new PostgresOnboardingRepository(pool, supplierConfigStore);
+    return globalThis.__openchipRepository;
+  }
+
   if (globalThis.__openchipStore === undefined) {
     globalThis.__openchipStore = createStore();
   }
 
-  if (globalThis.__openchipRepository === undefined) {
-    globalThis.__openchipRepository = new InMemoryOnboardingRepository(
-      globalThis.__openchipStore,
-      getSupplierConfigStore()
-    );
-  }
-
+  globalThis.__openchipRepository = new InMemoryOnboardingRepository(globalThis.__openchipStore, supplierConfigStore);
   return globalThis.__openchipRepository;
 }

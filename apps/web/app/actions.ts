@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { createMockDocuwareAdapter, createMockSapAdapter } from "@openchip/integrations";
 import {
   createCaseInputSchema,
+  documentCodes,
+  DocumentCode,
   identifierSchema,
   invitationTokenSchema,
   onboardingInitiatorRoles,
@@ -12,6 +14,7 @@ import {
   requirementMatrixUpdateSchema,
   supplierCategoryCreateSchema,
   supplierCategoryStatusSchema,
+  SupplierSubmissionInput,
   userUpsertSchema,
   supplierTypeCreateSchema,
   supplierTypeStatusSchema,
@@ -21,6 +24,7 @@ import {
 } from "@openchip/shared";
 import { evaluateCompliance } from "@openchip/workflow";
 import { actorFromSession, requireSessionRole, requireSessionUser } from "@/lib/auth";
+import { saveSupplierDocument } from "@/lib/document-storage";
 import { getEmailAdapter } from "@/lib/email";
 import { onboardingRepository } from "@/lib/repository";
 import { triggerCaseWorkflows } from "@/lib/workflow-runner";
@@ -37,6 +41,33 @@ function readFormValue(formData: FormData, key: string): string {
 function readFormValueOrEmpty(formData: FormData, key: string): string {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
+}
+
+function readOptionalFormValue(formData: FormData, key: string): string | undefined {
+  const value = formData.get(key);
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function isDocumentCode(value: string): value is DocumentCode {
+  return (documentCodes as readonly string[]).includes(value);
+}
+
+function readUploadedFiles(formData: FormData, key: string): File[] {
+  const values = formData.getAll(key);
+  const files: File[] = [];
+
+  for (const value of values) {
+    if (value instanceof File && value.size > 0) {
+      files.push(value);
+    }
+  }
+
+  return files;
 }
 
 function hasRole(role: InternalRole, allowedRoles: readonly InternalRole[]): boolean {
@@ -110,17 +141,101 @@ export async function sendInvitationAction(formData: FormData): Promise<void> {
 }
 
 export async function supplierSubmitAction(formData: FormData): Promise<void> {
-  const payload = supplierSubmissionSchema.parse({
-    token: invitationTokenSchema.parse(readFormValue(formData, "token")),
-    address: readFormValue(formData, "address"),
-    country: readFormValue(formData, "country")
+  const token = invitationTokenSchema.parse(readFormValue(formData, "token"));
+
+  const baseSubmission = supplierSubmissionSchema.safeParse({
+    token,
+    address: readFormValueOrEmpty(formData, "address"),
+    country: readFormValueOrEmpty(formData, "country"),
+    bankAccount: {
+      bkvid: readFormValueOrEmpty(formData, "bkvid"),
+      banks: readFormValueOrEmpty(formData, "banks"),
+      bankl: readFormValueOrEmpty(formData, "bankl"),
+      bankn: readOptionalFormValue(formData, "bankn"),
+      bkont: readOptionalFormValue(formData, "bkont"),
+      accname: readFormValueOrEmpty(formData, "accname"),
+      bkValidFrom: readFormValueOrEmpty(formData, "bkValidFrom"),
+      bkValidTo: readFormValueOrEmpty(formData, "bkValidTo"),
+      iban: readOptionalFormValue(formData, "iban")
+    },
+    uploadedDocuments: []
   });
 
-  const onboardingCase = await onboardingRepository.submitSupplierResponse(payload, "supplier.portal");
-  revalidatePath(`/supplier/${payload.token}`);
-  revalidatePath(`/cases/${onboardingCase.id}`);
-  revalidatePath("/");
-  redirect(`/supplier/${payload.token}?submitted=1`);
+  if (!baseSubmission.success) {
+    redirect(`/supplier/${token}?error=validation`);
+  }
+
+  const session = await onboardingRepository.getSupplierSession(token);
+  if (session === null) {
+    redirect(`/supplier/${token}?error=expired`);
+  }
+
+  const onboardingCase = await onboardingRepository.getCase(session.caseId);
+  if (onboardingCase === null) {
+    redirect(`/supplier/${token}?error=not-found`);
+  }
+
+  const requirements = await onboardingRepository.getRequirementSummary(onboardingCase.categoryCode);
+  const selectedFilesByCode = new Map<DocumentCode, File[]>();
+
+  for (const requirement of requirements) {
+    const files = readUploadedFiles(formData, `documentFiles.${requirement.code}`);
+    selectedFilesByCode.set(requirement.code, files);
+  }
+
+  const hasMissingMandatoryFiles = requirements.some(
+    (requirement) => requirement.requirementLevel === "mandatory" && (selectedFilesByCode.get(requirement.code)?.length ?? 0) === 0
+  );
+  if (hasMissingMandatoryFiles) {
+    redirect(`/supplier/${token}?error=missing-mandatory-documents`);
+  }
+
+  const uploadedDocuments: SupplierSubmissionInput["uploadedDocuments"] = [];
+  for (const [code, files] of selectedFilesByCode.entries()) {
+    if (files.length === 0) {
+      continue;
+    }
+
+    const savedFiles: SupplierSubmissionInput["uploadedDocuments"][number]["files"] = [];
+    for (const file of files) {
+      savedFiles.push(
+        await saveSupplierDocument({
+          caseId: onboardingCase.id,
+          code,
+          uploadedBy: "supplier.portal",
+          file
+        })
+      );
+    }
+
+    uploadedDocuments.push({
+      code,
+      files: savedFiles
+    });
+  }
+
+  const payload = supplierSubmissionSchema.safeParse({
+    token,
+    address: baseSubmission.data.address,
+    country: baseSubmission.data.country,
+    bankAccount: baseSubmission.data.bankAccount,
+    uploadedDocuments
+  });
+
+  if (!payload.success) {
+    redirect(`/supplier/${token}?error=validation`);
+  }
+
+  try {
+    const updatedCase = await onboardingRepository.submitSupplierResponse(payload.data, "supplier.portal");
+    revalidatePath(`/supplier/${payload.data.token}`);
+    revalidatePath(`/cases/${updatedCase.id}`);
+    revalidatePath("/");
+  } catch {
+    redirect(`/supplier/${token}?error=validation`);
+  }
+
+  redirect(`/supplier/${token}?submitted=1`);
 }
 
 export async function validateDocumentAction(formData: FormData): Promise<void> {
@@ -246,6 +361,25 @@ export async function sendExpiryReminderAction(formData: FormData): Promise<void
 
   revalidatePath(`/cases/${caseId}`);
   redirect(`/cases/${caseId}?toast=expiration_reminder_sent`);
+}
+
+export async function setDocumentExpiryAction(formData: FormData): Promise<void> {
+  const user = await requireSessionUser();
+  if (!hasRole(user.role, ["finance", "compliance", "admin"])) {
+    throw new Error("You do not have permission to set document expiry.");
+  }
+
+  const caseId = identifierSchema.parse(readFormValue(formData, "caseId"));
+  const code = readFormValue(formData, "code");
+  const validToRaw = readFormValueOrEmpty(formData, "validTo");
+  const validTo = validToRaw.length > 0 ? validToRaw : null;
+
+  if (!isDocumentCode(code)) {
+    throw new Error("Invalid document code.");
+  }
+
+  await onboardingRepository.setDocumentExpiry(caseId, code, validTo, actorFromSession(user));
+  revalidatePath(`/cases/${caseId}`);
 }
 
 export async function upsertUserAction(formData: FormData): Promise<void> {

@@ -76,7 +76,7 @@ export function CategoryRequirementsSelector({ categories, previewsByCategory }:
           required
           value={selectedCategoryCode}
           onChange={(event) => setSelectedCategoryCode(event.target.value)}
-          className="oc-select rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-slate-900"
+          className="oc-input oc-select"
         >
           <option value="">Select a supplier category</option>
           {categories.map((category) => (
