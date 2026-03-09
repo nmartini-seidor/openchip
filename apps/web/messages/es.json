@@ -21,6 +21,9 @@
       "supplierPortal": "Portal de Proveedor"
     },
     "language": {
+      "label": "Idioma",
+      "english": "Inglés",
+      "spanish": "Español",
       "switchToEnglish": "Cambiar idioma a inglés",
       "switchToSpanish": "Cambiar idioma a español"
     }
@@ -88,11 +91,14 @@
       "title": "Casos de onboarding",
       "subtitle": "Cola operativa",
       "empty": "Todavía no hay casos. Crea un nuevo caso para empezar.",
-      "emptyFiltered": "No hay casos para el filtro de origen seleccionado.",
+      "emptyFiltered": "No hay casos para los filtros seleccionados.",
       "filters": {
         "all": "Todos",
         "sapPr": "PR SAP",
-        "manual": "Manual"
+        "manual": "Manual",
+        "statusLabel": "Estado",
+        "allStatuses": "Todos los estados",
+        "apply": "Aplicar"
       },
       "table": {
         "supplier": "Proveedor",

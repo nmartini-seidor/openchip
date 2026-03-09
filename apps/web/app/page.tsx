@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { CaseStatus, caseStatuses } from "@openchip/shared";
 import { requireSessionUser } from "@/lib/auth";
 import { onboardingRepository } from "@/lib/repository";
 import { countdownBadgeClass, getCountdown } from "@/lib/sla";
@@ -11,6 +12,7 @@ function countByStatus(statuses: readonly string[], status: string): number {
 }
 
 type SourceFilter = "all" | "manual" | "sap_pr";
+type StatusFilter = "all" | CaseStatus;
 
 function resolveSourceFilter(candidate: string | undefined): SourceFilter {
   if (candidate === "manual" || candidate === "sap_pr") {
@@ -20,22 +22,62 @@ function resolveSourceFilter(candidate: string | undefined): SourceFilter {
   return "all";
 }
 
+function resolveStatusFilter(candidate: string | undefined): StatusFilter {
+  if (candidate !== undefined && candidate.length > 0 && caseStatuses.includes(candidate as CaseStatus)) {
+    return candidate as CaseStatus;
+  }
+
+  return "all";
+}
+
+function buildOverviewHref(sourceFilter: SourceFilter, statusFilter: StatusFilter): string {
+  const params = new URLSearchParams();
+  if (sourceFilter !== "all") {
+    params.set("source", sourceFilter);
+  }
+  if (statusFilter !== "all") {
+    params.set("status", statusFilter);
+  }
+  const query = params.toString();
+  return query.length > 0 ? `/?${query}` : "/";
+}
+
+function sortCases(left: { status: CaseStatus; updatedAt: string }, right: { status: CaseStatus; updatedAt: string }): number {
+  const leftCompleted = left.status === "supplier_created_in_sap";
+  const rightCompleted = right.status === "supplier_created_in_sap";
+
+  if (leftCompleted !== rightCompleted) {
+    return leftCompleted ? -1 : 1;
+  }
+
+  return new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime();
+}
+
 export default async function HomePage({
   searchParams
 }: {
-  searchParams: Promise<{ source?: string }>;
+  searchParams: Promise<{ source?: string; status?: string }>;
 }) {
   await requireSessionUser();
 
-  const [params, cases, tHome, tCommon, tSla] = await Promise.all([
+  const [params, cases, tHome, tCommon, tSla, tStatus] = await Promise.all([
     searchParams,
     onboardingRepository.listCases(),
     getTranslations("Home"),
     getTranslations("Common"),
-    getTranslations("Sla")
+    getTranslations("Sla"),
+    getTranslations("StatusBadge")
   ]);
   const sourceFilter = resolveSourceFilter(params.source);
-  const filteredCases = sourceFilter === "all" ? cases : cases.filter((onboardingCase) => onboardingCase.sourceChannel === sourceFilter);
+  const statusFilter = resolveStatusFilter(params.status);
+
+  const filteredCases = cases.filter((onboardingCase) => {
+    const matchesSource = sourceFilter === "all" || onboardingCase.sourceChannel === sourceFilter;
+    const matchesStatus = statusFilter === "all" || onboardingCase.status === statusFilter;
+    return matchesSource && matchesStatus;
+  });
+
+  const orderedCases = [...filteredCases].sort(sortCases);
 
   const countdownLabels = {
     notStarted: tSla("notStarted"),
@@ -86,9 +128,9 @@ export default async function HomePage({
       </section>
 
       <SectionCard title={tHome("cases.title")} subtitle={tHome("cases.subtitle")}>
-        <div className="mb-3 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap items-end gap-2">
           <Link
-            href="/"
+            href={buildOverviewHref("all", statusFilter)}
             className={`oc-btn oc-btn-compact ${
               sourceFilter === "all"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
@@ -98,7 +140,7 @@ export default async function HomePage({
             {tHome("cases.filters.all")}
           </Link>
           <Link
-            href="/?source=sap_pr"
+            href={buildOverviewHref("sap_pr", statusFilter)}
             className={`oc-btn oc-btn-compact ${
               sourceFilter === "sap_pr"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
@@ -108,7 +150,7 @@ export default async function HomePage({
             {tHome("cases.filters.sapPr")}
           </Link>
           <Link
-            href="/?source=manual"
+            href={buildOverviewHref("manual", statusFilter)}
             className={`oc-btn oc-btn-compact ${
               sourceFilter === "manual"
                 ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
@@ -117,6 +159,26 @@ export default async function HomePage({
           >
             {tHome("cases.filters.manual")}
           </Link>
+
+          <form method="get" className="ml-auto flex items-end gap-2">
+            {sourceFilter !== "all" ? <input type="hidden" name="source" value={sourceFilter} /> : null}
+            <div className="grid gap-1">
+              <label htmlFor="statusFilter" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+                {tHome("cases.filters.statusLabel")}
+              </label>
+              <select id="statusFilter" name="status" defaultValue={statusFilter} className="oc-input oc-select min-h-8 py-1 text-xs">
+                <option value="all">{tHome("cases.filters.allStatuses")}</option>
+                {caseStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {tStatus(status)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" className="oc-btn oc-btn-secondary oc-btn-compact">
+              {tHome("cases.filters.apply")}
+            </button>
+          </form>
         </div>
         {filteredCases.length === 0 ? (
           <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm text-slate-600">
@@ -137,17 +199,16 @@ export default async function HomePage({
                 </tr>
               </thead>
               <tbody>
-                {filteredCases.map((onboardingCase) => {
+                {orderedCases.map((onboardingCase) => {
                   const invitationSla = getCountdown(
                     onboardingCase.invitationOpenDeadlineAt,
                     onboardingCase.portalFirstAccessAt,
                     countdownLabels
                   );
-                  const completionSla = getCountdown(
-                    onboardingCase.onboardingCompletionDeadlineAt,
-                    onboardingCase.status === "supplier_created_in_sap" ? onboardingCase.updatedAt : null,
-                    countdownLabels
-                  );
+                  const completionSla =
+                    onboardingCase.status === "supplier_created_in_sap"
+                      ? null
+                      : getCountdown(onboardingCase.onboardingCompletionDeadlineAt, null, countdownLabels);
 
                   return (
                     <tr key={onboardingCase.id} className="border-b border-[var(--border)]/70 align-top">
@@ -181,9 +242,13 @@ export default async function HomePage({
                         </span>
                       </td>
                       <td className="py-3 pr-3">
-                        <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${countdownBadgeClass(completionSla.status)}`}>
-                          {completionSla.label}
-                        </span>
+                        {completionSla === null ? (
+                          <span className="text-xs font-semibold text-slate-400">—</span>
+                        ) : (
+                          <span className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold ${countdownBadgeClass(completionSla.status)}`}>
+                            {completionSla.label}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 pr-3">
                         <Link

@@ -21,6 +21,9 @@
       "supplierPortal": "Supplier Portal"
     },
     "language": {
+      "label": "Language",
+      "english": "English",
+      "spanish": "Spanish",
       "switchToEnglish": "Switch language to English",
       "switchToSpanish": "Switch language to Spanish"
     }
@@ -88,11 +91,14 @@
       "title": "Onboarding cases",
       "subtitle": "Operational queue",
       "empty": "No cases yet. Create a new onboarding case to begin.",
-      "emptyFiltered": "No cases match the selected source filter.",
+      "emptyFiltered": "No cases match the selected filters.",
       "filters": {
         "all": "All",
         "sapPr": "SAP PR",
-        "manual": "Manual"
+        "manual": "Manual",
+        "statusLabel": "State",
+        "allStatuses": "All states",
+        "apply": "Apply"
       },
       "table": {
         "supplier": "Supplier",

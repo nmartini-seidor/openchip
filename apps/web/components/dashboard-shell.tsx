@@ -162,37 +162,7 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
 
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-      <div className={clsx("grid min-h-screen", showInternalNavigation ? "grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)]" : "grid-cols-1")}>
-        {showInternalNavigation ? (
-          <aside className="hidden border-r border-[var(--border)] bg-[var(--surface)] px-5 py-6 lg:block">
-            <Link href="/" className="block rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-3 hover:bg-[var(--surface-subtle)]">
-              <Image src="/logo-openchip.svg" alt={t("appName")} width={168} height={52} className="h-9 w-auto" priority />
-              <p className="mt-2 text-sm font-semibold text-slate-900">{t("appSection")}</p>
-            </Link>
-
-            <nav className="mt-6 space-y-1" aria-label="Primary navigation">
-              {navItems.map((item) => {
-                const active = item.isActive(pathname);
-                return (
-                  <Link
-                    key={item.label}
-                    href={item.href}
-                    className={clsx(
-                      "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium",
-                      active
-                        ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
-                        : "border-transparent text-slate-600 hover:border-[var(--border)] hover:bg-[var(--surface-muted)] hover:text-slate-900"
-                    )}
-                  >
-                    {item.icon}
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </nav>
-          </aside>
-        ) : null}
-
+      <div className="grid min-h-screen grid-cols-1">
         <div className="min-w-0">
           {showHeader ? (
             <header className="sticky top-0 z-20 min-w-0 border-b border-[var(--border)] bg-[var(--surface)]/95 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur lg:px-8">
@@ -222,36 +192,23 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
 
                     {sessionUser !== null ? (
                       <>
-                        <div className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--surface-muted)] p-1">
-                          <form method="post" action="/api/preferences/locale">
-                            <input type="hidden" name="locale" value="en" />
-                            <input type="hidden" name="returnTo" value={pathname} />
-                            <button
-                              type="submit"
-                              className={clsx(
-                                "rounded px-2 py-1 text-xs font-semibold",
-                                locale === "en" ? "bg-[var(--surface)] text-slate-900" : "text-slate-600 hover:bg-[var(--surface)]"
-                              )}
-                              aria-label={t("language.switchToEnglish")}
-                            >
-                              EN
-                            </button>
-                          </form>
-                          <form method="post" action="/api/preferences/locale">
-                            <input type="hidden" name="locale" value="es" />
-                            <input type="hidden" name="returnTo" value={pathname} />
-                            <button
-                              type="submit"
-                              className={clsx(
-                                "rounded px-2 py-1 text-xs font-semibold",
-                                locale === "es" ? "bg-[var(--surface)] text-slate-900" : "text-slate-600 hover:bg-[var(--surface)]"
-                              )}
-                              aria-label={t("language.switchToSpanish")}
-                            >
-                              ES
-                            </button>
-                          </form>
-                        </div>
+                        <form method="post" action="/api/preferences/locale" className="w-28">
+                          <label htmlFor="shell-locale" className="sr-only">
+                            {t("language.label")}
+                          </label>
+                          <select
+                            id="shell-locale"
+                            name="locale"
+                            defaultValue={locale}
+                            aria-label={t("language.label")}
+                            onChange={(event) => event.currentTarget.form?.requestSubmit()}
+                            className="oc-input oc-select min-h-8 py-1 text-xs font-semibold text-slate-700"
+                          >
+                            <option value="en">{t("language.english")}</option>
+                            <option value="es">{t("language.spanish")}</option>
+                          </select>
+                          <input type="hidden" name="returnTo" value={pathname} />
+                        </form>
 
                         <details className="relative">
                           <summary className="flex cursor-pointer list-none items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-sm text-slate-700 hover:bg-[var(--surface-muted)]">
@@ -266,10 +223,7 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
                             <p className="mt-1 text-xs uppercase tracking-[0.1em] text-slate-500">{sessionUser.role}</p>
 
                             <form method="post" action="/api/auth/logout" className="mt-3">
-                              <button
-                                type="submit"
-                                className="oc-btn oc-btn-secondary w-full text-xs"
-                              >
+                              <button type="submit" className="oc-btn oc-btn-secondary w-full text-xs">
                                 {t("logout")}
                               </button>
                             </form>
@@ -282,18 +236,18 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
               </div>
 
               {showInternalNavigation ? (
-                <nav className="mt-3 flex w-full min-w-0 max-w-full gap-2 overflow-x-auto pb-1 lg:hidden" aria-label="Mobile navigation">
+                <nav className="mt-3 flex w-full min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-1" aria-label="Primary navigation">
                   {navItems.map((item) => {
                     const active = item.isActive(pathname);
                     return (
                       <Link
-                        key={`mobile-${item.label}`}
+                        key={`header-${item.label}`}
                         href={item.href}
                         className={clsx(
                           "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold",
                           active
                             ? "border-[var(--border-strong)] bg-[var(--surface-subtle)] text-slate-900"
-                            : "border-[var(--border)] bg-[var(--surface)] text-slate-600"
+                            : "border-[var(--border)] bg-[var(--surface)] text-slate-600 hover:bg-[var(--surface-muted)]"
                         )}
                       >
                         {item.icon}
