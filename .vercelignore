@@ -5,13 +5,12 @@ node_modules
 coverage
 playwright-report
 test-results
-output/playwright
-output/supplier-uploads
+output
 apps/web/output
+apps/web/.next
 .env
 .env.*
 !.env.example
-.DS_Store
 vercel.key
 vercel.token
-.vercel
+.DS_Store
