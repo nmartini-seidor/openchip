@@ -42,6 +42,11 @@ export function FilterableCountrySelect({
     <div className="grid gap-2">
       <label htmlFor={id} className="text-sm font-semibold text-slate-700">
         {label}
+        {required ? (
+          <span aria-hidden="true" className="ml-0.5 text-rose-600">
+            *
+          </span>
+        ) : null}
       </label>
       <Select<CountryOption, false>
         inputId={id}

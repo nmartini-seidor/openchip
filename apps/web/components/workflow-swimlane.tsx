@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { getTranslations } from "next-intl/server";
-import { CaseStatus, StatusHistoryEntry } from "@openchip/shared";
+import { ChevronRight } from "lucide-react";
+import { CaseSourceChannel, CaseStatus, StatusHistoryEntry } from "@openchip/shared";
 import { formatDateTime } from "@/lib/format";
 
 interface SwimlaneStep {
@@ -52,10 +53,12 @@ function getStatusDate(statusHistory: readonly StatusHistoryEntry[], status: str
 
 export async function WorkflowSwimlane({
   status,
-  statusHistory = []
+  statusHistory = [],
+  sourceChannel
 }: {
   status: CaseStatus;
   statusHistory?: readonly StatusHistoryEntry[];
+  sourceChannel: CaseSourceChannel;
 }) {
   const t = await getTranslations("WorkflowSwimlane");
   const activeIndex = getStatusIndex(status);
@@ -69,9 +72,14 @@ export async function WorkflowSwimlane({
           const isActive = activeIndex === index;
           const isPending = !isCompleted && !isActive;
           const date = getStatusDate(statusHistory, step.status);
+          const laneLabel =
+            sourceChannel === "sap_pr" &&
+            (step.status === "onboarding_initiated" || step.status === "invitation_sent")
+              ? t("lane.sap")
+              : t(step.laneKey);
 
           return (
-            <li key={step.status} className="flex min-w-0 flex-1 items-center gap-1">
+            <li key={step.status} className="flex min-w-0 flex-1 items-center gap-1" data-step-status={step.status}>
                 <div
                 className={clsx(
                   "flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border px-2 py-1.5",
@@ -80,9 +88,16 @@ export async function WorkflowSwimlane({
                     isPending && "border-[var(--border)] bg-[var(--surface-muted)]"
                   )}
                 >
-                  <p className={clsx("truncate text-xs font-semibold", isActive ? "text-[var(--primary)]" : "text-slate-700")} title={t(step.labelKey)}>{t(step.labelKey)}</p>
+                  <p
+                    className={clsx("truncate text-xs font-semibold", isActive ? "text-[var(--primary)]" : "text-slate-700")}
+                    title={t(step.labelKey)}
+                    data-label-for={step.status}
+                  >
+                    {t(step.labelKey)}
+                  </p>
                   <p className="mt-0.5 flex min-w-0 items-center gap-x-1 truncate text-[10px] text-slate-500">
                     <span
+                      data-lane-for={step.status}
                       className={clsx(
                         "shrink-0 rounded px-1 py-0.5 text-[9px] font-semibold uppercase tracking-[0.04em]",
                         isActive && "bg-[var(--primary)] text-white",
@@ -90,7 +105,7 @@ export async function WorkflowSwimlane({
                         isPending && "bg-slate-200 text-slate-600"
                       )}
                     >
-                      {t(step.laneKey)}
+                      {laneLabel}
                     </span>
                     {date !== null ? (
                       <time dateTime={date} title={formatDateTime(date)}>{formatDateTime(date)}</time>
@@ -100,19 +115,14 @@ export async function WorkflowSwimlane({
                   </p>
                 </div>
               {index < steps.length - 1 ? (
-                <svg
+                <ChevronRight
                   aria-hidden="true"
-                  viewBox="0 0 20 20"
                   className={clsx(
                     "h-3 w-3 shrink-0",
                     activeIndex >= index ? "text-[var(--primary)]" : "text-slate-400"
                   )}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                >
-                  <path d="m6 4 7 6-7 6" />
-                </svg>
+                  strokeWidth={1.8}
+                />
               ) : null}
             </li>
           );

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
+import { ArrowLeft, Plus } from "lucide-react";
 import { onboardingInitiatorRoles } from "@openchip/shared";
 import { createCaseAction } from "@/app/actions";
 import { CategoryRequirementsSelector } from "@/components/category-requirements-selector";
@@ -49,9 +50,7 @@ export default async function NewCasePage({ searchParams }: NewCasePageProps) {
           href="/"
           className="oc-btn oc-btn-secondary"
         >
-          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="m12.5 4.5-5 5 5 5" />
-          </svg>
+          <ArrowLeft aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
           {t("goBack")}
         </Link>
       </div>
@@ -65,9 +64,7 @@ export default async function NewCasePage({ searchParams }: NewCasePageProps) {
               formId="new-case-form"
               label={
                 <span className="inline-flex items-center gap-2">
-                  <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path d="M10 4v12M4 10h12" />
-                  </svg>
+                  <Plus aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
                   {t("createCase")}
                 </span>
               }

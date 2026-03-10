@@ -75,3 +75,30 @@ test("overview card filters suppliers by name and VAT as user types", async ({ p
 
   await captureCheckpoint(page, testInfo, "overview-card-live-supplier-search");
 });
+
+test("overview shows SAP source count and paginates suppliers by 10", async ({ page, request }) => {
+  await resetTestState(request);
+  const unique = Date.now().toString();
+
+  for (let index = 0; index < 12; index += 1) {
+    const seed = `${unique}${index}`.slice(-10);
+    await createSapCase(
+      request,
+      buildSapPayload(seed, `Paged Supplier ${index} ${unique}`, `ESP${seed.slice(-7)}${index}`)
+    );
+  }
+
+  await loginAsFinance(page);
+  await page.goto("/?source=sap_pr");
+
+  await expect(page.getByText("Created in SAP").locator("..").getByText("12", { exact: true })).toBeVisible();
+  await expect(page.getByText("Showing 1-10 of 12 suppliers")).toBeVisible();
+  await expect(page.getByText("Page 1 / 2")).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(10);
+
+  await page.getByRole("link", { name: "Next" }).click();
+  await expect(page).toHaveURL(/page=2/);
+  await expect(page.getByText("Showing 11-12 of 12 suppliers")).toBeVisible();
+  await expect(page.getByText("Page 2 \/ 2")).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(2);
+});

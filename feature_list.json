@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "last_updated": "2026-03-09T17:43:00Z",
+  "last_updated": "2026-03-10T11:55:00Z",
   "features": [
     {
       "id": "F-101",
@@ -168,6 +168,31 @@
         "curl -f http://localhost:3000/login"
       ],
       "notes": "Containers rebuilt/recreated; runtime services healthy; portal login endpoint reachable."
+    },
+    {
+      "id": "F-110",
+      "title": "Supplier template visibility and autosave UX hardening",
+      "status": "completed",
+      "dependencies": [
+        "F-103",
+        "F-105",
+        "F-106",
+        "F-108"
+      ],
+      "acceptance_criteria": [
+        "Supplier requirement accordion shows template download link only when template exists",
+        "Supplier submission CTA label is `Submit Response` and includes an icon",
+        "Supplier form uses autosave feedback indicator without manual save button",
+        "E2E coverage validates template available/unavailable behavior and autosave flow"
+      ],
+      "verification_steps": [
+        "pnpm -r typecheck",
+        "pnpm --filter @openchip/web test:e2e -- e2e/onboarding-supplier-template-autosave.spec.ts e2e/onboarding-supplier-documents.spec.ts",
+        "docker compose up -d --build --force-recreate",
+        "docker compose ps",
+        "curl -sf -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/login"
+      ],
+      "notes": "Supplier portal now exposes configured template downloads, keeps non-template requirements clearly labeled, and shows autosave status with translated EN/ES copy."
     }
   ]
 }

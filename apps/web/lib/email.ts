@@ -24,6 +24,7 @@ export function getEmailAdapter(): EmailAdapter {
 
     globalThis.__openchipEmailAdapter = createEmailAdapter({
       fromAddress: process.env.SMTP_FROM ?? "onboarding@openchip.local",
+      appBaseUrl: process.env.APP_BASE_URL ?? "http://localhost:3000",
       ...(smtpHost !== undefined ? { smtpHost } : {}),
       ...(smtpPort !== undefined ? { smtpPort } : {})
     });

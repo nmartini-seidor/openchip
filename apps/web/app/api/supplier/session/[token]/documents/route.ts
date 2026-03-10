@@ -26,6 +26,14 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     return NextResponse.json({ message: "Case not found" }, { status: 404 });
   }
 
+  const canEdit =
+    onboardingCase.status === "invitation_sent" ||
+    onboardingCase.status === "portal_accessed" ||
+    onboardingCase.status === "response_in_progress";
+  if (!canEdit) {
+    return NextResponse.json({ message: "Supplier response is closed" }, { status: 409 });
+  }
+
   const formData = await request.formData();
   const parsedCode = documentCodeSchema.safeParse(formData.get("code"));
   if (!parsedCode.success) {
@@ -48,16 +56,24 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     )
   );
 
-  await onboardingRepository.upsertSupplierDraftDocuments(
-    parsedToken.data,
-    [
-      {
-        code: parsedCode.data,
-        files: savedFiles
-      }
-    ],
-    "supplier.portal"
-  );
+  try {
+    await onboardingRepository.upsertSupplierDraftDocuments(
+      parsedToken.data,
+      [
+        {
+          code: parsedCode.data,
+          files: savedFiles
+        }
+      ],
+      "supplier.portal"
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to upload files";
+    if (message.toLowerCase().includes("response is open")) {
+      return NextResponse.json({ message: "Supplier response is closed" }, { status: 409 });
+    }
+    return NextResponse.json({ message }, { status: 400 });
+  }
 
   return NextResponse.json({
     code: parsedCode.data,

@@ -4,6 +4,7 @@ import {
   type OnboardingCase,
   type SapPurchaseRequestNewSupplierInput
 } from "@openchip/shared";
+import { ensureSupplierInvitation } from "@/lib/invitation";
 import { onboardingRepository } from "@/lib/repository";
 
 const sapApiKeyHeader = "x-api-key";
@@ -61,6 +62,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const existingCase = await onboardingRepository.getCaseBySourceReference("sap_pr", payload.sapSystem, payload.sapPrId);
   if (existingCase !== null) {
+    const actor = `sap.integration:${payload.sapSystem}`;
+    const caseWithInvitation =
+      existingCase.invitationToken === null ? await ensureSupplierInvitation(existingCase.id, actor) : existingCase;
+
     if (hasReplayConflict(existingCase, payload)) {
       return NextResponse.json(
         {
@@ -74,8 +79,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json(
       {
-        caseId: existingCase.id,
-        status: existingCase.status,
+        caseId: caseWithInvitation.id,
+        status: caseWithInvitation.status,
         sourceRef: `${payload.sapSystem}:${payload.sapPrId}`,
         idempotent: true
       },
@@ -111,11 +116,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         }
       }
     );
+    const invitedCase = await ensureSupplierInvitation(onboardingCase.id, `sap.integration:${payload.sapSystem}`);
 
     return NextResponse.json(
       {
-        caseId: onboardingCase.id,
-        status: onboardingCase.status,
+        caseId: invitedCase.id,
+        status: invitedCase.status,
         sourceRef: `${payload.sapSystem}:${payload.sapPrId}`,
         idempotent: false
       },

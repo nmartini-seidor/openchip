@@ -603,7 +603,10 @@ class PostgresSupplierConfigStore implements SupplierConfigStore {
 
     if (existingTypeCount === 0) {
       await this.seedDefaults("system.bootstrap");
+      return;
     }
+
+    await this.backfillMissingDefaults("system.bootstrap");
   }
 
   private async audit(eventType: string, actor: string, payload: Record<string, string>): Promise<void> {
@@ -730,6 +733,134 @@ class PostgresSupplierConfigStore implements SupplierConfigStore {
     }
 
     await this.audit("config_seeded", actor, { source: "docx-default" });
+  }
+
+  private async backfillMissingDefaults(actor: string): Promise<void> {
+    const timestamp = nowIso();
+
+    for (const seed of defaultSupplierTypeSeeds) {
+      await this.pool.query(
+        `
+        INSERT INTO supplier_config_types (id, key, label, active, created_at, updated_at)
+        VALUES ($1, $2, $3, TRUE, $4, $4)
+        ON CONFLICT (key) DO NOTHING
+        `,
+        [seed.id, seed.key, seed.label, timestamp]
+      );
+    }
+
+    for (const documentDefinition of documentCatalog) {
+      await this.pool.query(
+        `
+        INSERT INTO supplier_config_documents
+          (code, label_en, label_es, type, expiry_policy, owner, blocks_purchase_orders, active, template_storage_path, created_at, updated_at)
+        VALUES
+          ($1, $2, $3, $4, $5, $6, $7, TRUE, NULL, $8, $8)
+        ON CONFLICT (code) DO NOTHING
+        `,
+        [
+          normalizeDocumentCode(documentDefinition.code),
+          documentDefinition.labelEn,
+          documentDefinition.labelEs,
+          documentDefinition.type,
+          documentDefinition.expiryPolicy,
+          documentDefinition.owner,
+          documentDefinition.blocksPurchaseOrders,
+          timestamp
+        ]
+      );
+    }
+
+    const typeByKeyResult = await this.pool.query<{ id: string; key: string; label: string }>(
+      `SELECT id, key, label FROM supplier_config_types;`
+    );
+    const typeByKey = new Map<string, { id: string; key: string; label: string }>();
+    for (const row of typeByKeyResult.rows) {
+      typeByKey.set(row.key, row);
+    }
+
+    for (const category of supplierCategories) {
+      const type = typeByKey.get(category.type);
+      if (type === undefined) {
+        continue;
+      }
+
+      await this.pool.query(
+        `
+        INSERT INTO supplier_config_categories
+          (code, funding, type_id, location, label, active, created_at, updated_at)
+        VALUES
+          ($1, $2, $3, $4, $5, TRUE, $6, $6)
+        ON CONFLICT (code) DO NOTHING
+        `,
+        [category.code, category.funding, type.id, category.location, category.label, timestamp]
+      );
+    }
+
+    const [categoryRowsResult, documentRowsResult, existingRequirementsResult] = await Promise.all([
+      this.pool.query<{
+        code: string;
+        funding: FundingType;
+        type_key: string;
+        location: "national" | "international";
+      }>(
+        `
+        SELECT c.code, c.funding, t.key AS type_key, c.location
+        FROM supplier_config_categories c
+        INNER JOIN supplier_config_types t ON t.id = c.type_id
+        `
+      ),
+      this.pool.query<{ code: string }>(`SELECT code FROM supplier_config_documents`),
+      this.pool.query<{ category_code: string; document_code: string }>(
+        `SELECT category_code, document_code FROM supplier_config_requirements`
+      )
+    ]);
+
+    const defaultCategoryCodes = new Set(supplierCategories.map((category) => category.code));
+    const existingRequirementKeys = new Set(
+      existingRequirementsResult.rows.map((row) => `${row.category_code}::${row.document_code}`)
+    );
+
+    let insertedRequirements = 0;
+    for (const category of categoryRowsResult.rows) {
+      for (const document of documentRowsResult.rows) {
+        const normalizedCode = normalizeDocumentCode(document.code);
+        const requirementKey = `${category.code}::${normalizedCode}`;
+        if (existingRequirementKeys.has(requirementKey)) {
+          continue;
+        }
+
+        let requirementLevel: RequirementLevel = "not_applicable";
+        if (defaultCategoryCodes.has(category.code) && knownDocumentCodes.has(normalizedCode)) {
+          requirementLevel = getDefaultRequirementLevel({
+            funding: category.funding,
+            typeKey: category.type_key,
+            location: category.location,
+            documentCode: normalizedCode
+          });
+        }
+
+        await this.pool.query(
+          `
+          INSERT INTO supplier_config_requirements
+            (category_code, document_code, requirement_level, updated_at, updated_by)
+          VALUES
+            ($1, $2, $3, $4, $5)
+          ON CONFLICT (category_code, document_code) DO NOTHING
+          `,
+          [category.code, normalizedCode, requirementLevel, timestamp, actor]
+        );
+
+        existingRequirementKeys.add(requirementKey);
+        insertedRequirements += 1;
+      }
+    }
+
+    if (insertedRequirements > 0) {
+      await this.audit("requirement_matrix_backfilled", actor, {
+        insertedRequirements: `${insertedRequirements}`
+      });
+    }
   }
 
   async listSupplierTypes(includeInactive = false): Promise<SupplierTypeDefinition[]> {

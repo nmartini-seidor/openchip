@@ -100,7 +100,7 @@ export const supplierBankAccountSchema = z
   .object({
     bkvid: z.string().trim().regex(/^\d{4}$/),
     banks: z.string().trim().min(2).max(3).regex(/^[A-Z]{2,3}$/),
-    bankl: z.string().trim().min(1).max(15),
+    bankl: z.string().trim().max(15).optional().nullable(),
     bankn: z.string().trim().max(18).optional().nullable(),
     bkont: z.string().trim().max(2).optional().nullable(),
     accname: z.string().trim().min(2).max(40),
@@ -146,12 +146,13 @@ export const supplierBankAccountSchema = z
   .transform((value) => {
     const iban = value.iban === null ? undefined : value.iban?.trim();
     const bankn = value.bankn === null ? undefined : value.bankn?.trim();
+    const bankl = value.bankl === null ? undefined : value.bankl?.trim();
     const bkont = value.bkont === null ? undefined : value.bkont?.trim();
 
     return {
       bkvid: value.bkvid,
       banks: value.banks.toUpperCase(),
-      bankl: value.bankl,
+      bankl: bankl !== undefined && bankl.length > 0 ? bankl : "",
       bankn: bankn !== undefined && bankn.length > 0 ? bankn : null,
       bkont: bkont !== undefined && bkont.length > 0 ? bkont : null,
       accname: value.accname,
@@ -238,7 +239,11 @@ export const loginInputSchema = z.object({
 
 export const portalSettingsSchema = z.object({
   invitationOpenHours: z.coerce.number().int().min(1).max(168),
-  onboardingCompletionDays: z.coerce.number().int().min(1).max(90)
+  onboardingCompletionDays: z.coerce.number().int().min(1).max(90),
+  sapBaseUrl: z.string().trim().url().max(300),
+  sapApiKey: z.string().trim().min(1).max(300),
+  docuwareBaseUrl: z.string().trim().url().max(300),
+  docuwareApiKey: z.string().trim().min(1).max(300)
 });
 
 export const userUpsertSchema = z.object({

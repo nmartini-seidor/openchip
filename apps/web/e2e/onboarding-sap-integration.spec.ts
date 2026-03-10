@@ -39,7 +39,7 @@ test("sap pr integration creates idempotent onboarding cases and is visible in q
   expect(createResponse.status()).toBe(201);
   const createdBody = (await createResponse.json()) as { caseId: string; idempotent: boolean; status: string };
   expect(createdBody.idempotent).toBeFalsy();
-  expect(createdBody.status).toBe("onboarding_initiated");
+  expect(createdBody.status).toBe("invitation_sent");
 
   const replayResponse = await request.post("/api/v1/integrations/cases", {
     headers: {
@@ -78,6 +78,13 @@ test("sap pr integration creates idempotent onboarding cases and is visible in q
   const createdRow = page.locator("tr").filter({ hasText: payload.supplierName }).first();
   await expect(createdRow).toContainText("SAP PR");
   await expect(createdRow).toContainText(payload.supplierVat);
+
+  await page.goto(`/cases/${createdBody.caseId}`);
+  await expect(page.locator('[data-lane-for="onboarding_initiated"]')).toHaveText("SAP");
+  await expect(page.locator('[data-lane-for="invitation_sent"]')).toHaveText("SAP");
+  await expect(page.locator('[data-label-for="validation_completed_pending_supplier_creation"]')).toHaveText("Validation");
+  await expect(page.locator('[data-lane-for="validation_completed_pending_supplier_creation"]')).toHaveText("Internal");
+  await expect(page.locator("time").first()).toContainText("CET");
 
   await captureCheckpoint(page, testInfo, "sap-integration-queue");
 });

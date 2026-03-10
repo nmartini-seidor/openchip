@@ -71,7 +71,7 @@ export async function createSupplierPortalSession(input: {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 60 * 60 * 24 * 14
+    maxAge: 60 * 60 * 48
   });
 }
 

@@ -46,8 +46,14 @@ import { getSupplierConfigStore, SupplierConfigStore } from "./supplier-config-s
 const INVITATION_TTL_DAYS = 14;
 const DEFAULT_INVITATION_OPEN_HOURS = 48;
 const DEFAULT_ONBOARDING_COMPLETION_DAYS = 14;
+const DEFAULT_SAP_BASE_URL = "https://sap.example.local/api";
+const DEFAULT_SAP_API_KEY = "test-sap-key";
+const DEFAULT_DOCUWARE_BASE_URL = "https://docuware.example.local/api";
+const DEFAULT_DOCUWARE_API_KEY = "test-docuware-key";
 const SUPPLIER_OTP_TTL_MINUTES = 10;
 const SUPPLIER_OTP_MAX_ATTEMPTS = 5;
+
+type PortalSettingsUpdateInput = Omit<PortalSettings, "updatedAt" | "updatedBy">;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -133,6 +139,10 @@ function createDocumentSubmission(
   };
 }
 
+function canSupplierEditResponse(status: CaseStatus): boolean {
+  return status === "invitation_sent" || status === "portal_accessed" || status === "response_in_progress";
+}
+
 function toRequirementSummarySubmission(row: RequirementPreviewRow): DocumentSubmission {
   return {
     code: row.code,
@@ -175,6 +185,10 @@ function createDefaultPortalSettings(): PortalSettings {
   return {
     invitationOpenHours: DEFAULT_INVITATION_OPEN_HOURS,
     onboardingCompletionDays: DEFAULT_ONBOARDING_COMPLETION_DAYS,
+    sapBaseUrl: process.env.SAP_BASE_URL ?? DEFAULT_SAP_BASE_URL,
+    sapApiKey: process.env.SAP_INTEGRATION_API_KEY ?? DEFAULT_SAP_API_KEY,
+    docuwareBaseUrl: process.env.DOCUWARE_BASE_URL ?? DEFAULT_DOCUWARE_BASE_URL,
+    docuwareApiKey: process.env.DOCUWARE_API_KEY ?? DEFAULT_DOCUWARE_API_KEY,
     updatedAt: nowIso(),
     updatedBy: "system.bootstrap"
   };
@@ -304,7 +318,7 @@ export interface OnboardingRepository {
   getRequirementPreview(categoryCode: SupplierCategoryCode): Promise<RequirementPreviewRow[]>;
   listRequirementPreviewsForActiveCategories(): Promise<Record<string, RequirementPreviewRow[]>>;
   updatePortalSettings(
-    input: Pick<PortalSettings, "invitationOpenHours" | "onboardingCompletionDays">,
+    input: PortalSettingsUpdateInput,
     actor: string
   ): Promise<PortalSettings>;
   recordWorkflowTrigger(
@@ -673,6 +687,9 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     if (onboardingCase === undefined || onboardingCase.invitationExpiresAt === null) {
       throw new Error("Invalid supplier invitation token.");
     }
+    if (!canSupplierEditResponse(onboardingCase.status)) {
+      throw new Error("Supplier draft can only be edited while the response is open.");
+    }
 
     if (onboardingCase.status === "invitation_sent") {
       const accessedStatus = transitionCaseStatus(onboardingCase.status, "portal_accessed");
@@ -718,6 +735,9 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     const onboardingCase = [...this.store.cases.values()].find((candidate) => candidate.invitationToken === token);
     if (onboardingCase === undefined || onboardingCase.invitationExpiresAt === null) {
       throw new Error("Invalid supplier invitation token.");
+    }
+    if (!canSupplierEditResponse(onboardingCase.status)) {
+      throw new Error("Supplier documents can only be uploaded while the response is open.");
     }
 
     const currentDraft = onboardingCase.supplierDraft ?? {
@@ -794,6 +814,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
 
     const requirements = await this.supplierConfigStore.listRequirementPreviewRows(onboardingCase.categoryCode);
     const uploadedDocumentsByCode = new Map<DocumentCode, UploadedDocumentFile[]>();
+    const existingDocumentsByCode = new Map(onboardingCase.documents.map((document) => [document.code, document]));
     const allUploadedDocuments =
       input.uploadedDocuments.length > 0
         ? input.uploadedDocuments
@@ -814,12 +835,60 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
         continue;
       }
 
-      const files = uploadedDocumentsByCode.get(row.code) ?? [];
-      if (row.requirementLevel === "mandatory" && files.length === 0) {
+      const incomingFiles = uploadedDocumentsByCode.get(row.code) ?? [];
+      const existingDocument = existingDocumentsByCode.get(row.code);
+
+      if (existingDocument !== undefined) {
+        const mergedFiles = [...existingDocument.files, ...incomingFiles];
+
+        if (existingDocument.status === "rejected") {
+          if (incomingFiles.length === 0) {
+            throw new Error(`Rejected requirement ${row.code} is missing uploaded files.`);
+          }
+
+          documents.push({
+            ...existingDocument,
+            requirementLevel: row.requirementLevel,
+            status: "pending_validation",
+            uploadedAt: incomingFiles.at(-1)?.uploadedAt ?? nowIso(),
+            files: mergedFiles,
+            approver: null,
+            validationDate: null,
+            validFrom: null,
+            validTo: null,
+            comments: null
+          });
+          continue;
+        }
+
+        if (incomingFiles.length > 0) {
+          documents.push({
+            ...existingDocument,
+            requirementLevel: row.requirementLevel,
+            status: "pending_validation",
+            uploadedAt: incomingFiles.at(-1)?.uploadedAt ?? existingDocument.uploadedAt ?? nowIso(),
+            files: mergedFiles,
+            approver: null,
+            validationDate: null,
+            validFrom: null,
+            validTo: null,
+            comments: null
+          });
+          continue;
+        }
+
+        documents.push({
+          ...existingDocument,
+          requirementLevel: row.requirementLevel
+        });
+        continue;
+      }
+
+      if (row.requirementLevel === "mandatory" && incomingFiles.length === 0) {
         throw new Error(`Mandatory requirement ${row.code} is missing uploaded files.`);
       }
 
-      documents.push(createDocumentSubmission(row.code, row.requirementLevel, files));
+      documents.push(createDocumentSubmission(row.code, row.requirementLevel, incomingFiles));
     }
 
     onboardingCase.documents = documents;
@@ -865,6 +934,11 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       document.version += 1;
       document.validFrom = null;
       document.validTo = null;
+      const reopenedStatus = transitionCaseStatus(onboardingCase.status, "response_in_progress");
+      this.pushHistory(onboardingCase, reopenedStatus, input.approver, `Document ${document.code} rejected; supplier response reopened`);
+      this.pushEvent(onboardingCase, "supplier_rework_requested", input.approver, {
+        documentCode: document.code
+      });
     }
 
     this.pushEvent(onboardingCase, "document_validated", input.approver, {
@@ -1132,12 +1206,16 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
   }
 
   async updatePortalSettings(
-    input: Pick<PortalSettings, "invitationOpenHours" | "onboardingCompletionDays">,
+    input: PortalSettingsUpdateInput,
     actor: string
   ): Promise<PortalSettings> {
     this.store.portalSettings = {
       invitationOpenHours: input.invitationOpenHours,
       onboardingCompletionDays: input.onboardingCompletionDays,
+      sapBaseUrl: input.sapBaseUrl,
+      sapApiKey: input.sapApiKey,
+      docuwareBaseUrl: input.docuwareBaseUrl,
+      docuwareApiKey: input.docuwareApiKey,
       updatedAt: nowIso(),
       updatedBy: actor
     };
@@ -1150,7 +1228,11 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
       actor,
       payload: {
         invitationOpenHours: this.store.portalSettings.invitationOpenHours.toString(),
-        onboardingCompletionDays: this.store.portalSettings.onboardingCompletionDays.toString()
+        onboardingCompletionDays: this.store.portalSettings.onboardingCompletionDays.toString(),
+        sapBaseUrl: this.store.portalSettings.sapBaseUrl,
+        sapApiKeyConfigured: this.store.portalSettings.sapApiKey.length > 0 ? "true" : "false",
+        docuwareBaseUrl: this.store.portalSettings.docuwareBaseUrl,
+        docuwareApiKeyConfigured: this.store.portalSettings.docuwareApiKey.length > 0 ? "true" : "false"
       },
       deliveryStatus: "pending"
     });
@@ -1362,7 +1444,56 @@ function fromPersistedStorePayload(payload: unknown): Store {
     cases,
     integrationEvents: rawEvents as IntegrationEvent[],
     users,
-    portalSettings: rawPortalSettings as unknown as PortalSettings
+    portalSettings: normalizePortalSettings(rawPortalSettings)
+  };
+}
+
+function normalizePortalSettings(rawPortalSettings: Record<string, unknown>): PortalSettings {
+  const defaults = createDefaultPortalSettings();
+
+  const invitationOpenHours =
+    typeof rawPortalSettings.invitationOpenHours === "number" && Number.isFinite(rawPortalSettings.invitationOpenHours)
+      ? rawPortalSettings.invitationOpenHours
+      : defaults.invitationOpenHours;
+  const onboardingCompletionDays =
+    typeof rawPortalSettings.onboardingCompletionDays === "number" &&
+    Number.isFinite(rawPortalSettings.onboardingCompletionDays)
+      ? rawPortalSettings.onboardingCompletionDays
+      : defaults.onboardingCompletionDays;
+  const sapBaseUrl =
+    typeof rawPortalSettings.sapBaseUrl === "string" && rawPortalSettings.sapBaseUrl.trim().length > 0
+      ? rawPortalSettings.sapBaseUrl
+      : defaults.sapBaseUrl;
+  const sapApiKey =
+    typeof rawPortalSettings.sapApiKey === "string" && rawPortalSettings.sapApiKey.trim().length > 0
+      ? rawPortalSettings.sapApiKey
+      : defaults.sapApiKey;
+  const docuwareBaseUrl =
+    typeof rawPortalSettings.docuwareBaseUrl === "string" && rawPortalSettings.docuwareBaseUrl.trim().length > 0
+      ? rawPortalSettings.docuwareBaseUrl
+      : defaults.docuwareBaseUrl;
+  const docuwareApiKey =
+    typeof rawPortalSettings.docuwareApiKey === "string" && rawPortalSettings.docuwareApiKey.trim().length > 0
+      ? rawPortalSettings.docuwareApiKey
+      : defaults.docuwareApiKey;
+  const updatedAt =
+    typeof rawPortalSettings.updatedAt === "string" && rawPortalSettings.updatedAt.trim().length > 0
+      ? rawPortalSettings.updatedAt
+      : defaults.updatedAt;
+  const updatedBy =
+    typeof rawPortalSettings.updatedBy === "string" && rawPortalSettings.updatedBy.trim().length > 0
+      ? rawPortalSettings.updatedBy
+      : defaults.updatedBy;
+
+  return {
+    invitationOpenHours,
+    onboardingCompletionDays,
+    sapBaseUrl,
+    sapApiKey,
+    docuwareBaseUrl,
+    docuwareApiKey,
+    updatedAt,
+    updatedBy
   };
 }
 
@@ -1636,7 +1767,7 @@ class PostgresOnboardingRepository implements OnboardingRepository {
   }
 
   async updatePortalSettings(
-    input: Pick<PortalSettings, "invitationOpenHours" | "onboardingCompletionDays">,
+    input: PortalSettingsUpdateInput,
     actor: string
   ): Promise<PortalSettings> {
     return this.withWriteStore((repository) => repository.updatePortalSettings(input, actor));

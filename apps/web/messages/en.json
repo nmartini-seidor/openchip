@@ -64,7 +64,8 @@
       "pendingValidation": "pending validation",
       "approved": "approved",
       "rejected": "rejected",
-      "approvedProvisionally": "approved provisionally"
+      "approvedProvisionally": "approved provisionally",
+      "expired": "expired"
     }
   },
   "Sla": {
@@ -92,10 +93,15 @@
       "subtitle": "Operational queue",
       "empty": "No suppliers yet. Create a new onboarding supplier to begin.",
       "emptyFiltered": "No suppliers match the selected filters.",
+      "paginationSummary": "Showing {from}-{to} of {total} suppliers",
+      "pageIndicator": "Page {page} / {totalPages}",
+      "previous": "Previous",
+      "next": "Next",
       "filters": {
         "all": "All",
         "sapPr": "SAP PR",
         "manual": "Manual",
+        "nonCompliant": "Non-Compliant",
         "statusLabel": "State",
         "allStatuses": "All states",
         "searchLabel": "Search",
@@ -106,6 +112,9 @@
         "supplier": "Supplier",
         "source": "Source",
         "status": "Status",
+        "compliance": "Compliance",
+        "compliant": "Compliant",
+        "nonCompliant": "Non-Compliant",
         "action": "Action",
         "openCase": "Open supplier"
       }
@@ -190,6 +199,8 @@
       "applying": "Applying...",
       "setExpiry": "Set expiry",
       "settingExpiry": "Saving...",
+      "saveSupplier": "Save Supplier",
+      "savingSupplier": "Saving supplier...",
       "noFiles": "No files",
       "noAction": "No action available"
     },
@@ -242,12 +253,17 @@
     "actor": "User",
     "action": {
       "expiration_reminder_sent": "Expiration reminder sent",
-      "supplier_info_updated": "Supplier information updated"
+      "supplier_info_updated": "Supplier information updated",
+      "document_expiry_updated": "Document expiry updated",
+      "supplier_rework_requested": "Supplier correction requested"
     }
   },
   "WorkflowSwimlane": {
     "title": "Workflow",
     "cancelled": "Supplier is cancelled.",
+    "lane": {
+      "sap": "SAP"
+    },
     "steps": {
       "onboarding_initiated": {
         "lane": "Internal",
@@ -270,8 +286,8 @@
         "label": "Submission completed"
       },
       "validation_completed_pending_supplier_creation": {
-        "lane": "Validation",
-        "label": "Validation completed"
+        "lane": "Internal",
+        "label": "Validation"
       },
       "supplier_created_in_sap": {
         "lane": "SAP",
@@ -281,16 +297,34 @@
   },
   "PortalSettings": {
     "title": "Portal Settings",
-    "subtitle": "SLA windows for supplier onboarding",
+    "subtitle": "Manage onboarding configuration in dedicated tabs",
+    "tabs": {
+      "navigationLabel": "Portal settings sections",
+      "portal": "Portal Settings",
+      "categories": "Supplier Categories",
+      "documents": "Document Catalog",
+      "matrix": "Requirement Matrix"
+    },
+    "portal": {
+      "subtitle": "SLA windows and integration endpoints"
+    },
     "invitationOpenHours": "Max time to open onboarding invitation (hours)",
     "onboardingCompletionDays": "Max time to complete onboarding (days)",
+    "integrationsTitle": "Outbound integrations",
+    "integrationsSubtitle": "Configure target endpoints for SAP and Docuware pushes.",
+    "sapBaseUrl": "SAP endpoint base URL",
+    "sapApiKey": "SAP API key",
+    "docuwareBaseUrl": "Docuware endpoint base URL",
+    "docuwareApiKey": "Docuware API key",
     "saveSettings": "Save portal settings",
     "savingSettings": "Saving settings...",
     "supplierTypes": {
       "title": "Supplier Types",
       "subtitle": "Manage assignable supplier types",
+      "label": "Label",
       "key": "Key",
       "status": "Status",
+      "action": "Action",
       "active": "Active",
       "inactive": "Inactive",
       "deactivate": "Deactivate",
@@ -305,6 +339,7 @@
       "title": "Supplier Categories",
       "subtitle": "Assign funding, type, and location combinations",
       "status": "Status",
+      "action": "Action",
       "active": "Active",
       "inactive": "Inactive",
       "deactivate": "Deactivate",
@@ -333,6 +368,9 @@
       "activate": "Activate",
       "deactivate": "Deactivate",
       "blocksPurchaseOrders": "Blocks purchase orders",
+      "blocksPurchaseOrdersShort": "Blocks P.O.",
+      "template": "Template",
+      "action": "Action",
       "yes": "Yes",
       "no": "No",
       "save": "Save",
@@ -350,69 +388,75 @@
       "subtitle": "Edit document requirements for each supplier category",
       "empty": "Create at least one supplier category to edit requirement mappings.",
       "category": "Category",
-      "loadCategory": "Load category",
       "editing": "Editing",
       "document": "Document",
       "level": "Level",
-      "action": "Action",
       "save": "Save",
+      "saveAll": "Save matrix changes",
       "saving": "Saving..."
-    },
-    "policy": {
-      "title": "Current policy",
-      "subtitle": "Latest compliance configuration",
-      "invitationSla": "Invitation open SLA",
-      "completionSla": "Completion SLA",
-      "lastUpdate": "Last update",
-      "hours": "hours",
-      "days": "days",
-      "by": "by"
     }
   },
   "Users": {
     "title": "Users",
-    "subtitle": "Role assignment and account status",
+    "subtitle": "Manage internal accounts and permissions",
     "displayName": "Display name",
     "role": "Role",
     "status": "Status",
+    "action": "Action",
     "active": "Active",
     "inactive": "Inactive",
     "save": "Save",
     "saving": "Saving...",
-    "addTitle": "Add user",
-    "addSubtitle": "Create a new internal account",
+    "searchLabel": "Search users",
+    "searchPlaceholder": "Type name or email",
+    "noResults": "No users match the current search.",
     "email": "Email",
     "createUser": "Create user",
-    "creatingUser": "Creating..."
+    "creatingUser": "Creating...",
+    "paginationSummary": "Showing {from}-{to} of {total} users",
+    "previous": "Previous",
+    "next": "Next",
+    "pageIndicator": "Page {page}/{totalPages}"
   },
   "SupplierPortal": {
     "title": "Supplier submission portal",
     "subtitle": "Complete your onboarding details",
+    "accessTitle": "Supplier access",
+    "accessSubtitle": "Sign in with the verification code sent to your email.",
+    "language": "Language",
+    "locale": {
+      "english": "English",
+      "spanish": "Spanish"
+    },
     "supplier": "Supplier",
+    "closedTitle": "Response submitted",
     "submitted": "Response submitted. Internal team will continue the process.",
-    "resumeNotice": "You can save your progress and resume onboarding at any time before final submission.",
-    "draftSavedNotice": "Draft saved.",
+    "reworkNotice": "One or more documents were rejected. Upload corrected files and submit the response again.",
+    "resumeNotice": "Your progress is saved automatically. You can close this page and resume onboarding any time before final submission.",
     "street": "Street",
     "city": "City",
     "postalCode": "Postal code",
     "country": "Country",
     "countryPlaceholder": "Select a country",
     "bankSectionTitle": "Bank account details",
-    "bankSectionSubtitle": "If IBAN is provided, bank account number can be omitted.",
+    "bankSectionSubtitle": "Provide IBAN or bank account number in the same field.",
     "banks": "Bank country/region key (BANKS)",
-    "bankl": "Bank key (BANKL)",
+    "ibanOrAccountNumber": "IBAN or bank account number",
+    "ibanInvalid": "Invalid IBAN format/checksum.",
+    "ibanValid": "Valid IBAN.",
     "bankn": "Bank account number (BANKN)",
-    "bkont": "Bank control key (BKONT)",
     "accname": "Bank account holder name",
     "iban": "IBAN",
-    "saveDraft": "Save progress",
-    "savingDraft": "Saving progress...",
-    "draftSaved": "Progress saved",
+    "autoSaveIdle": "Autosave enabled",
+    "autoSaving": "Autosaving...",
+    "autoSaved": "All changes saved",
     "draftSaveError": "Could not save progress right now.",
-    "submit": "Submit supplier response",
+    "submit": "Submit Response",
     "submitting": "Submitting...",
     "requiredDocsTitle": "Required documentation",
     "requiredDocsSubtitle": "Open a requirement, download template if available, and upload one or more files.",
+    "missingMandatoryTitle": "Missing mandatory documents",
+    "missingMandatoryHint": "Upload at least one file for each mandatory requirement before submitting.",
     "uploadFiles": "Upload files",
     "uploadingFiles": "Uploading files...",
     "templateDownload": "Download template",
@@ -421,15 +465,18 @@
     "noFiles": "No uploaded files yet.",
     "otp": {
       "title": "Verify access",
-      "subtitle": "Request a one-time code sent to {email} and enter it to continue.",
+      "subtitle": "Open your email inbox to find the verification code.",
       "requestCode": "Send verification code",
+      "resendCode": "Resend verification code",
       "requestingCode": "Sending code...",
+      "cooldownLabel": "Resend code in {seconds}s",
       "codeLabel": "Verification code",
       "verify": "Verify code",
       "verifying": "Verifying...",
-      "requested": "Verification code sent.",
+      "requested": "Verification code sent to {email}.",
       "verified": "Access verified.",
       "failed": "Unable to send verification code.",
+      "cooldownError": "Please wait before requesting another verification code.",
       "expired": "The verification code has expired. Request a new one.",
       "attemptsExceeded": "Too many failed attempts. Request a new verification code.",
       "notRequested": "Request a verification code first.",
@@ -438,6 +485,10 @@
     "errors": {
       "validation": "Review your data and uploads. Mandatory requirements must include at least one file.",
       "missingMandatoryDocuments": "Missing files for one or more mandatory requirements.",
+      "missingRejectedDocuments": "Upload a file for each rejected document before submitting again.",
+      "validationFieldsTitle": "Fix these fields",
+      "missingMandatoryDocumentsTitle": "Mandatory documents still missing",
+      "missingRejectedDocumentsTitle": "Rejected documents pending correction",
       "expired": "This supplier link has expired.",
       "notFound": "This supplier is no longer available.",
       "otpRequired": "Complete OTP verification to access the onboarding form."

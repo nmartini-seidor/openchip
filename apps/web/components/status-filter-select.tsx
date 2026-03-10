@@ -29,8 +29,9 @@ export function StatusFilterSelect({ label, allLabel, value, options }: StatusFi
     } else {
       params.set("status", nextValue);
     }
+    params.delete("page");
     const query = params.toString();
-    router.replace(query.length > 0 ? `${pathname}?${query}` : pathname);
+    router.replace(query.length > 0 ? `${pathname}?${query}` : pathname, { scroll: false });
   }
 
   return (

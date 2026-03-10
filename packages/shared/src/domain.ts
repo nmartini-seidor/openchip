@@ -332,7 +332,12 @@ export interface StatusHistoryEntry {
   note: string;
 }
 
-export const caseActionTypes = ["expiration_reminder_sent", "supplier_info_updated"] as const;
+export const caseActionTypes = [
+  "expiration_reminder_sent",
+  "supplier_info_updated",
+  "document_expiry_updated",
+  "supplier_rework_requested"
+] as const;
 
 export type CaseActionType = (typeof caseActionTypes)[number];
 
@@ -466,6 +471,10 @@ export interface UserUpsertInput {
 export interface PortalSettings {
   invitationOpenHours: number;
   onboardingCompletionDays: number;
+  sapBaseUrl: string;
+  sapApiKey: string;
+  docuwareBaseUrl: string;
+  docuwareApiKey: string;
   updatedAt: string;
   updatedBy: string;
 }

@@ -1,27 +1,88 @@
+import Image from "next/image";
+import { CheckSquare, SendHorizontal, TriangleAlert } from "lucide-react";
 import { getTranslations } from "next-intl/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { invitationTokenSchema, RequirementPreviewRow } from "@openchip/shared";
 import { requestSupplierOtpAction, supplierSubmitAction, verifySupplierOtpAction } from "@/app/actions";
 import { SectionCard } from "@/components/section-card";
 import { SubmitButton } from "@/components/submit-button";
+import { SupplierLocaleSelector } from "@/components/supplier-locale-selector";
 import { SupplierOnboardingForm } from "@/components/supplier-onboarding-form";
+import { SupplierOtpRequestButton } from "@/components/supplier-otp-request-button";
 import { getCurrentLocale } from "@/lib/auth";
 import { listCountryOptions } from "@/lib/countries";
+import { getEmailAdapter } from "@/lib/email";
 import { onboardingRepository } from "@/lib/repository";
 import { hasSupplierPortalSession } from "@/lib/supplier-session";
+
+interface SupplierSearchParams {
+  submitted?: string;
+  error?: string;
+  fields?: string;
+  docs?: string;
+  otp?: string;
+  otpError?: string;
+  draft?: string;
+}
+
+function getSupplierReturnTo(token: string, query: SupplierSearchParams): string {
+  const params = new URLSearchParams();
+  if (query.submitted !== undefined) {
+    params.set("submitted", query.submitted);
+  }
+  if (query.error !== undefined) {
+    params.set("error", query.error);
+  }
+  if (query.fields !== undefined) {
+    params.set("fields", query.fields);
+  }
+  if (query.docs !== undefined) {
+    params.set("docs", query.docs);
+  }
+  if (query.otp !== undefined) {
+    params.set("otp", query.otp);
+  }
+  if (query.otpError !== undefined) {
+    params.set("otpError", query.otpError);
+  }
+  if (query.draft !== undefined) {
+    params.set("draft", query.draft);
+  }
+
+  const serialized = params.toString();
+  return serialized.length > 0 ? `/supplier/${token}?${serialized}` : `/supplier/${token}`;
+}
+
+function getOtpCooldownSeconds(requestedAt: string | null): number {
+  if (requestedAt === null) {
+    return 0;
+  }
+
+  const elapsedSeconds = Math.floor((Date.now() - new Date(requestedAt).getTime()) / 1000);
+  if (!Number.isFinite(elapsedSeconds) || elapsedSeconds >= 60) {
+    return 0;
+  }
+
+  return Math.max(0, 60 - elapsedSeconds);
+}
+
+function parseCsvQueryParam(value: string | undefined): string[] {
+  if (value === undefined || value.trim().length === 0) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry, index, list) => entry.length > 0 && list.indexOf(entry) === index);
+}
 
 export default async function SupplierPortalPage({
   params,
   searchParams
 }: {
   params: Promise<{ token: string }>;
-  searchParams: Promise<{
-    submitted?: string;
-    error?: string;
-    otp?: string;
-    otpError?: string;
-    draft?: string;
-  }>;
+  searchParams: Promise<SupplierSearchParams>;
 }) {
   const [{ token }, query, locale, tSupplier, tCommon] = await Promise.all([
     params,
@@ -49,28 +110,40 @@ export default async function SupplierPortalPage({
   const hasPortalSession = await hasSupplierPortalSession(parsedToken.data, onboardingCase.id);
   const isOtpVerified = hasPortalSession && session.otpVerified;
 
-  if (isOtpVerified) {
-    await onboardingRepository.registerPortalAccess(parsedToken.data, "supplier.portal");
+  if (!isOtpVerified && onboardingCase.supplierOtpState.requestedAt === null) {
+    try {
+      const updatedCase = await onboardingRepository.requestSupplierOtp(
+        { token: parsedToken.data },
+        "supplier.portal"
+      );
+      if (updatedCase.supplierOtpState.code !== null && updatedCase.supplierOtpState.expiresAt !== null) {
+        try {
+          const emailAdapter = getEmailAdapter();
+          await emailAdapter.sendSupplierOtpEmail({
+            to: session.supplierContactEmail,
+            supplierName: updatedCase.supplierName,
+            otpCode: updatedCase.supplierOtpState.code,
+            expiresAt: updatedCase.supplierOtpState.expiresAt
+          });
+        } catch {
+          // Keep flow available if email adapter fails.
+        }
+      }
+    } catch {
+      redirect(`/supplier/${parsedToken.data}?otp=failed`);
+    }
+
+    redirect(`/supplier/${parsedToken.data}?otp=requested`);
   }
 
-  const countryOptions = listCountryOptions(locale);
-  const requirements = (await onboardingRepository.getRequirementPreview(onboardingCase.categoryCode)).filter(
-    (item): item is RequirementPreviewRow & { requirementLevel: "mandatory" | "optional" } =>
-      item.requirementLevel === "mandatory" || item.requirementLevel === "optional"
-  );
-  const requirementLevelLabels: Record<string, string> = {
-    mandatory: tCommon("requirementLevel.mandatory"),
-    optional: tCommon("requirementLevel.optional")
-  };
-
-  const draftUploadsByCode = new Map<string, typeof onboardingCase.documents[number]["files"]>();
-  for (const draftDocument of onboardingCase.supplierDraft?.uploadedDocuments ?? []) {
-    draftUploadsByCode.set(draftDocument.code, draftDocument.files);
+  if (isOtpVerified) {
+    await onboardingRepository.registerPortalAccess(parsedToken.data, "supplier.portal");
   }
 
   const errorMessages: Record<string, string> = {
     validation: tSupplier("errors.validation"),
     "missing-mandatory-documents": tSupplier("errors.missingMandatoryDocuments"),
+    "missing-rejected-documents": tSupplier("errors.missingRejectedDocuments"),
     expired: tSupplier("errors.expired"),
     "not-found": tSupplier("errors.notFound"),
     "otp-required": tSupplier("errors.otpRequired")
@@ -79,7 +152,7 @@ export default async function SupplierPortalPage({
 
   const otpStateMessage =
     query.otp === "requested"
-      ? tSupplier("otp.requested")
+      ? tSupplier("otp.requested", { email: session.supplierContactEmail })
       : query.otp === "verified"
         ? tSupplier("otp.verified")
         : query.otp === "failed"
@@ -93,162 +166,273 @@ export default async function SupplierPortalPage({
         ? tSupplier("otp.attemptsExceeded")
         : query.otpError === "not-requested"
           ? tSupplier("otp.notRequested")
-          : query.otpError === "invalid"
-            ? tSupplier("otp.invalid")
-            : null;
+          : query.otpError === "cooldown"
+            ? tSupplier("otp.cooldownError")
+            : query.otpError === "invalid"
+              ? tSupplier("otp.invalid")
+              : null;
+
+  if (!isOtpVerified) {
+    const supplierReturnTo = getSupplierReturnTo(parsedToken.data, query);
+    const otpRequestedAt = onboardingCase.supplierOtpState.requestedAt;
+    const otpCooldownSeconds = getOtpCooldownSeconds(otpRequestedAt);
+
+    return (
+      <main id="main-content" className="mx-auto flex min-h-[70vh] w-full max-w-md items-center justify-center">
+        <section className="w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-sm">
+          <div className="mb-5 flex justify-center">
+            <Image src="/logo-openchip.svg" alt="Openchip" width={220} height={68} className="h-12 w-auto" priority />
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold text-slate-900">{tSupplier("accessTitle")}</h1>
+          <p className="mt-1 text-sm text-slate-600">{tSupplier("accessSubtitle")}</p>
+
+          {otpStateMessage !== null ? (
+            <p className="mt-4 rounded-md border border-[#bdd4c5] bg-[#edf5ef] px-3 py-2 text-sm text-[var(--success)]">{otpStateMessage}</p>
+          ) : null}
+          {otpErrorMessage !== null ? (
+            <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{otpErrorMessage}</p>
+          ) : null}
+          {errorMessage !== null ? (
+            <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
+          ) : null}
+
+          <form action={verifySupplierOtpAction} className="mt-5 grid gap-4">
+            <input type="hidden" name="token" value={parsedToken.data} />
+            <div className="grid gap-2">
+              <label htmlFor="otpCode" className="text-sm font-semibold text-slate-700">
+                {tSupplier("otp.codeLabel")}
+              </label>
+              <input
+                id="otpCode"
+                name="otpCode"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="\d{6}"
+                maxLength={6}
+                required
+                className="oc-input"
+              />
+            </div>
+            <button type="submit" className="oc-btn oc-btn-primary w-full">
+              {tSupplier("otp.verify")}
+            </button>
+          </form>
+
+          <div className="mt-4 grid gap-2">
+            <p className="text-xs text-slate-600">{tSupplier("otp.subtitle")}</p>
+            <form action={requestSupplierOtpAction}>
+              <input type="hidden" name="token" value={parsedToken.data} />
+              <SupplierOtpRequestButton
+                hasRequested={otpRequestedAt !== null}
+                initialCooldownSeconds={otpCooldownSeconds}
+                requestLabel={tSupplier("otp.requestCode")}
+                resendLabel={tSupplier("otp.resendCode")}
+                pendingLabel={tSupplier("otp.requestingCode")}
+                cooldownLabelTemplate={tSupplier("otp.cooldownLabel", { seconds: "{seconds}" })}
+                className="oc-btn oc-btn-secondary w-full disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </form>
+          </div>
+
+          <div className="mt-5 border-t border-[var(--border)] pt-4">
+            <SupplierLocaleSelector
+              initialLocale={locale}
+              label={tSupplier("language")}
+              englishLabel={tSupplier("locale.english")}
+              spanishLabel={tSupplier("locale.spanish")}
+              returnTo={supplierReturnTo}
+            />
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  const countryOptions = listCountryOptions(locale);
+  const requirements = (await onboardingRepository.getRequirementPreview(onboardingCase.categoryCode)).filter(
+    (item): item is RequirementPreviewRow & { requirementLevel: "mandatory" | "optional" } =>
+      item.requirementLevel === "mandatory" || item.requirementLevel === "optional"
+  );
+  const isSupplierResponseOpen =
+    onboardingCase.status === "invitation_sent" ||
+    onboardingCase.status === "portal_accessed" ||
+    onboardingCase.status === "response_in_progress";
+  const hasRejectedDocuments = onboardingCase.documents.some((document) => document.status === "rejected");
+  const requirementLevelLabels: Record<string, string> = {
+    mandatory: tCommon("requirementLevel.mandatory"),
+    optional: tCommon("requirementLevel.optional")
+  };
+  const requirementLabelByCode = new Map(
+    requirements.map((requirement) => [requirement.code, locale === "es" ? requirement.labelEs : requirement.labelEn])
+  );
+  const invalidFieldKeys = parseCsvQueryParam(query.fields);
+  const invalidFieldLabelByKey: Record<string, string> = {
+    street: tSupplier("street"),
+    city: tSupplier("city"),
+    postalCode: tSupplier("postalCode"),
+    country: tSupplier("country"),
+    banks: tSupplier("banks"),
+    bankn: tSupplier("ibanOrAccountNumber"),
+    accname: tSupplier("accname"),
+    iban: tSupplier("ibanOrAccountNumber")
+  };
+  const invalidFieldLabels = invalidFieldKeys
+    .map((key) => invalidFieldLabelByKey[key])
+    .filter((label): label is string => label !== undefined);
+  const missingDocumentCodes = parseCsvQueryParam(query.docs);
+  const missingDocumentLabels = missingDocumentCodes.map((code) => ({
+    code,
+    label: requirementLabelByCode.get(code) ?? code
+  }));
+  const missingDocumentsTitle =
+    query.error === "missing-rejected-documents"
+      ? tSupplier("errors.missingRejectedDocumentsTitle")
+      : tSupplier("errors.missingMandatoryDocumentsTitle");
+
+  const draftUploadsByCode = new Map<string, typeof onboardingCase.documents[number]["files"]>();
+  for (const draftDocument of onboardingCase.supplierDraft?.uploadedDocuments ?? []) {
+    draftUploadsByCode.set(draftDocument.code, draftDocument.files);
+  }
+
+  const initialAddress = onboardingCase.supplierDraft?.address ?? onboardingCase.supplierAddress ?? {};
+  const initialBankAccountSource = onboardingCase.supplierDraft?.bankAccount ?? onboardingCase.supplierBankAccount;
 
   return (
     <main id="main-content" className="w-full">
       <SectionCard title={tSupplier("title")} subtitle={tSupplier("subtitle")}>
-        <p className="text-sm text-slate-600">
-          {tSupplier("supplier")}: <span className="font-semibold text-slate-900">{onboardingCase.supplierName}</span> · VAT:{" "}
-          {onboardingCase.supplierVat}
-        </p>
-
-        {query.submitted === "1" ? (
-          <p className="mt-4 rounded-md border border-[#bdd4c5] bg-[#edf5ef] px-3 py-2 text-sm text-[var(--success)]">{tSupplier("submitted")}</p>
-        ) : null}
-        {errorMessage !== null ? (
-          <p className="mt-4 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
-        ) : null}
-
-        {!isOtpVerified ? (
-          <div className="mt-6 grid gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-            <div>
-              <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-700">{tSupplier("otp.title")}</h3>
-              <p className="mt-1 text-sm text-slate-600">{tSupplier("otp.subtitle", { email: session.supplierContactEmail })}</p>
+        {!isSupplierResponseOpen ? (
+          <article
+            data-testid="supplier-submitted-card"
+            className="mx-auto mt-4 max-w-2xl rounded-xl border border-[#bdd4c5] bg-[#edf5ef] p-5 shadow-sm"
+          >
+            <div className="flex items-start gap-3">
+              <CheckSquare aria-hidden="true" className="mt-0.5 h-5 w-5 text-[var(--success)]" strokeWidth={2} />
+              <div className="space-y-1">
+                <p className="text-base font-semibold text-slate-900">{tSupplier("closedTitle")}</p>
+                <p className="text-sm text-[var(--success)]">{tSupplier("submitted")}</p>
+              </div>
             </div>
-
-            {otpStateMessage !== null ? (
-              <p className="rounded-md border border-[#bdd4c5] bg-[#edf5ef] px-3 py-2 text-sm text-[var(--success)]">{otpStateMessage}</p>
+          </article>
+        ) : (
+          <>
+            {hasRejectedDocuments ? (
+              <div className="mt-1 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                <TriangleAlert aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2} />
+                <p>{tSupplier("reworkNotice")}</p>
+              </div>
             ) : null}
-            {otpErrorMessage !== null ? (
-              <p className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{otpErrorMessage}</p>
+
+            {errorMessage !== null ? (
+              <div className="mt-1 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                <p>{errorMessage}</p>
+                {invalidFieldLabels.length > 0 ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em]">{tSupplier("errors.validationFieldsTitle")}</p>
+                    <ul className="mt-1 list-disc pl-4 text-xs">
+                      {invalidFieldLabels.map((label) => (
+                        <li key={label}>{label}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+                {missingDocumentLabels.length > 0 ? (
+                  <div className="mt-2">
+                    <p className="text-xs font-semibold uppercase tracking-[0.08em]">{missingDocumentsTitle}</p>
+                    <ul className="mt-1 list-disc pl-4 text-xs">
+                      {missingDocumentLabels.map((item) => (
+                        <li key={item.code}>
+                          {item.code} - {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
 
-            <form action={requestSupplierOtpAction} className="flex flex-wrap items-center gap-3">
+            <form action={supplierSubmitAction} className="mt-6 space-y-5">
               <input type="hidden" name="token" value={parsedToken.data} />
-              <SubmitButton
-                label={tSupplier("otp.requestCode")}
-                pendingLabel={tSupplier("otp.requestingCode")}
-                className="oc-btn oc-btn-secondary"
+              <input type="hidden" name="bkvid" value="0001" />
+
+              <p className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-slate-700">
+                {tSupplier("resumeNotice")}
+              </p>
+
+              <SupplierOnboardingForm
+                token={parsedToken.data}
+                labels={{
+                  street: tSupplier("street"),
+                  city: tSupplier("city"),
+                  postalCode: tSupplier("postalCode"),
+                  country: tSupplier("country"),
+                  countryPlaceholder: tSupplier("countryPlaceholder"),
+                  bankSectionTitle: tSupplier("bankSectionTitle"),
+                  bankSectionSubtitle: tSupplier("bankSectionSubtitle"),
+                  banks: tSupplier("banks"),
+                  ibanOrAccountNumber: tSupplier("ibanOrAccountNumber"),
+                  ibanInvalid: tSupplier("ibanInvalid"),
+                  ibanValid: tSupplier("ibanValid"),
+                  accname: tSupplier("accname"),
+                  autoSaveIdle: tSupplier("autoSaveIdle"),
+                  autoSaving: tSupplier("autoSaving"),
+                  autoSaved: tSupplier("autoSaved"),
+                  draftSaveError: tSupplier("draftSaveError"),
+                  requiredDocsTitle: tSupplier("requiredDocsTitle"),
+                  requiredDocsSubtitle: tSupplier("requiredDocsSubtitle"),
+                  uploadFiles: tSupplier("uploadFiles"),
+                  uploadingFiles: tSupplier("uploadingFiles"),
+                  templateDownload: tSupplier("templateDownload"),
+                  noTemplate: tSupplier("noTemplate"),
+                  uploadedFiles: tSupplier("uploadedFiles"),
+                  noFiles: tSupplier("noFiles"),
+                  missingMandatoryTitle: tSupplier("missingMandatoryTitle"),
+                  missingMandatoryHint: tSupplier("missingMandatoryHint")
+                }}
+                countries={countryOptions}
+                requirements={requirements.map((requirement) => ({
+                  code: requirement.code,
+                  label: locale === "es" ? requirement.labelEs : requirement.labelEn,
+                  requirementLevel: requirement.requirementLevel,
+                  requirementLabel: requirementLevelLabels[requirement.requirementLevel] ?? requirement.requirementLevel,
+                  templateHref:
+                    requirement.templateStoragePath === null
+                      ? null
+                      : `/api/supplier/session/${parsedToken.data}/templates/${requirement.code}`,
+                  files:
+                    draftUploadsByCode.get(requirement.code) ??
+                    onboardingCase.documents.find((item) => item.code === requirement.code)?.files ??
+                    []
+                }))}
+                initialDraft={{
+                  address: initialAddress,
+                  bankAccount: {
+                    ...(initialBankAccountSource?.banks !== undefined ? { banks: initialBankAccountSource.banks } : {}),
+                    ...(initialBankAccountSource?.bankn !== null && initialBankAccountSource?.bankn !== undefined
+                      ? { bankn: initialBankAccountSource.bankn }
+                      : {}),
+                    ...(initialBankAccountSource?.accname !== undefined ? { accname: initialBankAccountSource.accname } : {}),
+                    ...(initialBankAccountSource?.iban !== null && initialBankAccountSource?.iban !== undefined
+                      ? { iban: initialBankAccountSource.iban }
+                      : {})
+                  }
+                }}
+                initialMissingDocumentCodes={missingDocumentCodes}
               />
-            </form>
 
-            <form action={verifySupplierOtpAction} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-              <input type="hidden" name="token" value={parsedToken.data} />
-              <div className="grid gap-2">
-                <label htmlFor="otpCode" className="text-sm font-semibold text-slate-700">
-                  {tSupplier("otp.codeLabel")}
-                </label>
-                <input
-                  id="otpCode"
-                  name="otpCode"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  pattern="\d{6}"
-                  maxLength={6}
-                  required
-                  className="oc-input"
+              <div className="flex justify-end">
+                <SubmitButton
+                  label={
+                    <>
+                      <SendHorizontal aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
+                      {tSupplier("submit")}
+                    </>
+                  }
+                  pendingLabel={tSupplier("submitting")}
+                  className="oc-btn oc-btn-primary disabled:opacity-60"
                 />
               </div>
-              <SubmitButton
-                label={tSupplier("otp.verify")}
-                pendingLabel={tSupplier("otp.verifying")}
-                className="oc-btn oc-btn-primary"
-              />
             </form>
-          </div>
-        ) : (
-          <form action={supplierSubmitAction} className="mt-6 space-y-5">
-            <input type="hidden" name="token" value={parsedToken.data} />
-            <input type="hidden" name="bkvid" value="0001" />
-
-            <p className="rounded-md border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm text-slate-700">
-              {tSupplier("resumeNotice")}
-              {query.draft === "saved" ? ` ${tSupplier("draftSavedNotice")}` : ""}
-            </p>
-
-            <SupplierOnboardingForm
-              token={parsedToken.data}
-              labels={{
-                street: tSupplier("street"),
-                city: tSupplier("city"),
-                postalCode: tSupplier("postalCode"),
-                country: tSupplier("country"),
-                countryPlaceholder: tSupplier("countryPlaceholder"),
-                bankSectionTitle: tSupplier("bankSectionTitle"),
-                bankSectionSubtitle: tSupplier("bankSectionSubtitle"),
-                banks: tSupplier("banks"),
-                bankl: tSupplier("bankl"),
-                iban: tSupplier("iban"),
-                bankn: tSupplier("bankn"),
-                bkont: tSupplier("bkont"),
-                accname: tSupplier("accname"),
-                saveDraft: tSupplier("saveDraft"),
-                savingDraft: tSupplier("savingDraft"),
-                draftSaved: tSupplier("draftSaved"),
-                draftSaveError: tSupplier("draftSaveError"),
-                requiredDocsTitle: tSupplier("requiredDocsTitle"),
-                requiredDocsSubtitle: tSupplier("requiredDocsSubtitle"),
-                uploadFiles: tSupplier("uploadFiles"),
-                uploadingFiles: tSupplier("uploadingFiles"),
-                templateDownload: tSupplier("templateDownload"),
-                noTemplate: tSupplier("noTemplate"),
-                uploadedFiles: tSupplier("uploadedFiles"),
-                noFiles: tSupplier("noFiles")
-              }}
-              countries={countryOptions}
-              requirements={requirements.map((requirement) => ({
-                code: requirement.code,
-                label: locale === "es" ? requirement.labelEs : requirement.labelEn,
-                requirementLevel: requirement.requirementLevel,
-                requirementLabel: requirementLevelLabels[requirement.requirementLevel] ?? requirement.requirementLevel,
-                templateHref:
-                  requirement.templateStoragePath === null
-                    ? null
-                    : `/api/supplier/session/${parsedToken.data}/templates/${requirement.code}`,
-                files:
-                  draftUploadsByCode.get(requirement.code) ??
-                  onboardingCase.documents.find((item) => item.code === requirement.code)?.files ??
-                  []
-              }))}
-              initialDraft={{
-                address: onboardingCase.supplierDraft?.address ?? {},
-                bankAccount: {
-                  ...(onboardingCase.supplierDraft?.bankAccount.banks !== undefined
-                    ? { banks: onboardingCase.supplierDraft.bankAccount.banks }
-                    : {}),
-                  ...(onboardingCase.supplierDraft?.bankAccount.bankl !== undefined
-                    ? { bankl: onboardingCase.supplierDraft.bankAccount.bankl }
-                    : {}),
-                  ...(onboardingCase.supplierDraft?.bankAccount.bankn !== null &&
-                  onboardingCase.supplierDraft?.bankAccount.bankn !== undefined
-                    ? { bankn: onboardingCase.supplierDraft.bankAccount.bankn }
-                    : {}),
-                  ...(onboardingCase.supplierDraft?.bankAccount.bkont !== null &&
-                  onboardingCase.supplierDraft?.bankAccount.bkont !== undefined
-                    ? { bkont: onboardingCase.supplierDraft.bankAccount.bkont }
-                    : {}),
-                  ...(onboardingCase.supplierDraft?.bankAccount.accname !== undefined
-                    ? { accname: onboardingCase.supplierDraft.bankAccount.accname }
-                    : {}),
-                  ...(onboardingCase.supplierDraft?.bankAccount.iban !== null &&
-                  onboardingCase.supplierDraft?.bankAccount.iban !== undefined
-                    ? { iban: onboardingCase.supplierDraft.bankAccount.iban }
-                    : {})
-                }
-              }}
-            />
-
-            <div className="flex justify-end">
-              <SubmitButton
-                label={tSupplier("submit")}
-                pendingLabel={tSupplier("submitting")}
-                className="oc-btn oc-btn-primary disabled:opacity-60"
-              />
-            </div>
-          </form>
+          </>
         )}
       </SectionCard>
     </main>

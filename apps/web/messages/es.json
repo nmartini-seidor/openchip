@@ -64,7 +64,8 @@
       "pendingValidation": "pendiente de validación",
       "approved": "aprobado",
       "rejected": "rechazado",
-      "approvedProvisionally": "aprobado provisionalmente"
+      "approvedProvisionally": "aprobado provisionalmente",
+      "expired": "caducado"
     }
   },
   "Sla": {
@@ -92,10 +93,15 @@
       "subtitle": "Cola operativa",
       "empty": "Todavía no hay proveedores. Crea un nuevo proveedor para empezar.",
       "emptyFiltered": "No hay proveedores para los filtros seleccionados.",
+      "paginationSummary": "Mostrando {from}-{to} de {total} proveedores",
+      "pageIndicator": "Página {page} / {totalPages}",
+      "previous": "Anterior",
+      "next": "Siguiente",
       "filters": {
         "all": "Todos",
         "sapPr": "PR SAP",
         "manual": "Manual",
+        "nonCompliant": "No cumple",
         "statusLabel": "Estado",
         "allStatuses": "Todos los estados",
         "searchLabel": "Buscar",
@@ -106,6 +112,9 @@
         "supplier": "Proveedor",
         "source": "Origen",
         "status": "Estado",
+        "compliance": "Cumplimiento",
+        "compliant": "Cumple",
+        "nonCompliant": "No cumple",
         "action": "Acción",
         "openCase": "Abrir proveedor"
       }
@@ -190,6 +199,8 @@
       "applying": "Aplicando...",
       "setExpiry": "Guardar fecha",
       "settingExpiry": "Guardando...",
+      "saveSupplier": "Guardar proveedor",
+      "savingSupplier": "Guardando proveedor...",
       "noFiles": "Sin archivos",
       "noAction": "Sin acción disponible"
     },
@@ -242,12 +253,17 @@
     "actor": "Usuario",
     "action": {
       "expiration_reminder_sent": "Recordatorio de expiración enviado",
-      "supplier_info_updated": "Información del proveedor actualizada"
+      "supplier_info_updated": "Información del proveedor actualizada",
+      "document_expiry_updated": "Caducidad documental actualizada",
+      "supplier_rework_requested": "Corrección solicitada al proveedor"
     }
   },
   "WorkflowSwimlane": {
     "title": "Flujo",
     "cancelled": "El proveedor está cancelado.",
+    "lane": {
+      "sap": "SAP"
+    },
     "steps": {
       "onboarding_initiated": {
         "lane": "Interno",
@@ -270,8 +286,8 @@
         "label": "Envío completado"
       },
       "validation_completed_pending_supplier_creation": {
-        "lane": "Validación",
-        "label": "Validación completada"
+        "lane": "Interno",
+        "label": "Validación"
       },
       "supplier_created_in_sap": {
         "lane": "SAP",
@@ -281,16 +297,34 @@
   },
   "PortalSettings": {
     "title": "Configuración del portal",
-    "subtitle": "Ventanas de SLA para el onboarding de proveedores",
+    "subtitle": "Gestiona la configuración del onboarding en pestañas",
+    "tabs": {
+      "navigationLabel": "Secciones de configuración del portal",
+      "portal": "Configuración del portal",
+      "categories": "Categorías de proveedor",
+      "documents": "Catálogo documental",
+      "matrix": "Matriz de requisitos"
+    },
+    "portal": {
+      "subtitle": "Ventanas SLA y endpoints de integración"
+    },
     "invitationOpenHours": "Tiempo máximo para abrir la invitación de onboarding (horas)",
     "onboardingCompletionDays": "Tiempo máximo para completar el onboarding (días)",
+    "integrationsTitle": "Integraciones de salida",
+    "integrationsSubtitle": "Configura endpoints de destino para envíos a SAP y Docuware.",
+    "sapBaseUrl": "URL base endpoint SAP",
+    "sapApiKey": "Clave API SAP",
+    "docuwareBaseUrl": "URL base endpoint Docuware",
+    "docuwareApiKey": "Clave API Docuware",
     "saveSettings": "Guardar configuración del portal",
     "savingSettings": "Guardando configuración...",
     "supplierTypes": {
       "title": "Tipos de proveedor",
       "subtitle": "Gestiona los tipos de proveedor asignables",
+      "label": "Etiqueta",
       "key": "Clave",
       "status": "Estado",
+      "action": "Acción",
       "active": "Activo",
       "inactive": "Inactivo",
       "deactivate": "Desactivar",
@@ -305,6 +339,7 @@
       "title": "Categorías de proveedor",
       "subtitle": "Asigna combinaciones de financiación, tipo y ubicación",
       "status": "Estado",
+      "action": "Acción",
       "active": "Activo",
       "inactive": "Inactivo",
       "deactivate": "Desactivar",
@@ -333,6 +368,9 @@
       "activate": "Activar",
       "deactivate": "Desactivar",
       "blocksPurchaseOrders": "Bloquea pedidos de compra",
+      "blocksPurchaseOrdersShort": "Bloq. P.O.",
+      "template": "Plantilla",
+      "action": "Acción",
       "yes": "Sí",
       "no": "No",
       "save": "Guardar",
@@ -350,69 +388,75 @@
       "subtitle": "Edita requisitos documentales por categoría",
       "empty": "Crea al menos una categoría para editar la matriz de requisitos.",
       "category": "Categoría",
-      "loadCategory": "Cargar categoría",
       "editing": "Editando",
       "document": "Documento",
       "level": "Nivel",
-      "action": "Acción",
       "save": "Guardar",
+      "saveAll": "Guardar cambios de matriz",
       "saving": "Guardando..."
-    },
-    "policy": {
-      "title": "Política actual",
-      "subtitle": "Configuración de cumplimiento vigente",
-      "invitationSla": "SLA apertura invitación",
-      "completionSla": "SLA finalización",
-      "lastUpdate": "Última actualización",
-      "hours": "horas",
-      "days": "días",
-      "by": "por"
     }
   },
   "Users": {
     "title": "Usuarios",
-    "subtitle": "Asignación de roles y estado de cuentas",
+    "subtitle": "Gestión de cuentas internas y permisos",
     "displayName": "Nombre visible",
     "role": "Rol",
     "status": "Estado",
+    "action": "Acción",
     "active": "Activo",
     "inactive": "Inactivo",
     "save": "Guardar",
     "saving": "Guardando...",
-    "addTitle": "Añadir usuario",
-    "addSubtitle": "Crea una nueva cuenta interna",
+    "searchLabel": "Buscar usuarios",
+    "searchPlaceholder": "Escribe nombre o correo",
+    "noResults": "No hay usuarios para la búsqueda actual.",
     "email": "Correo",
     "createUser": "Crear usuario",
-    "creatingUser": "Creando..."
+    "creatingUser": "Creando...",
+    "paginationSummary": "Mostrando {from}-{to} de {total} usuarios",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "pageIndicator": "Página {page}/{totalPages}"
   },
   "SupplierPortal": {
     "title": "Portal de proveedor",
     "subtitle": "Completa la información de onboarding",
+    "accessTitle": "Acceso de proveedor",
+    "accessSubtitle": "Inicia sesión con el código de verificación enviado a tu correo.",
+    "language": "Idioma",
+    "locale": {
+      "english": "Inglés",
+      "spanish": "Español"
+    },
     "supplier": "Proveedor",
+    "closedTitle": "Respuesta enviada",
     "submitted": "Respuesta enviada. El equipo interno continuará el proceso.",
-    "resumeNotice": "Puedes guardar tu progreso y retomar el onboarding en cualquier momento antes del envío final.",
-    "draftSavedNotice": "Borrador guardado.",
+    "reworkNotice": "Uno o más documentos fueron rechazados. Sube archivos corregidos y vuelve a enviar la respuesta.",
+    "resumeNotice": "Tu progreso se guarda automáticamente. Puedes cerrar esta página y retomar el onboarding en cualquier momento antes del envío final.",
     "street": "Calle",
     "city": "Ciudad",
     "postalCode": "Código postal",
     "country": "País",
     "countryPlaceholder": "Selecciona un país",
     "bankSectionTitle": "Datos bancarios",
-    "bankSectionSubtitle": "Si se informa IBAN, el número de cuenta puede omitirse.",
+    "bankSectionSubtitle": "Indica IBAN o número de cuenta en el mismo campo.",
     "banks": "Clave país/región banco (BANKS)",
-    "bankl": "Clave banco (BANKL)",
+    "ibanOrAccountNumber": "IBAN o número de cuenta bancaria",
+    "ibanInvalid": "IBAN inválido (formato o checksum).",
+    "ibanValid": "IBAN válido.",
     "bankn": "Número de cuenta bancaria (BANKN)",
-    "bkont": "Clave de control (BKONT)",
     "accname": "Titular de la cuenta bancaria",
     "iban": "IBAN",
-    "saveDraft": "Guardar progreso",
-    "savingDraft": "Guardando progreso...",
-    "draftSaved": "Progreso guardado",
+    "autoSaveIdle": "Autoguardado activo",
+    "autoSaving": "Guardando automáticamente...",
+    "autoSaved": "Todos los cambios guardados",
     "draftSaveError": "No se pudo guardar el progreso ahora.",
     "submit": "Enviar respuesta",
     "submitting": "Enviando...",
     "requiredDocsTitle": "Documentación requerida",
     "requiredDocsSubtitle": "Abre un requisito, descarga plantilla si existe y sube uno o varios archivos.",
+    "missingMandatoryTitle": "Documentos obligatorios pendientes",
+    "missingMandatoryHint": "Sube al menos un archivo por cada requisito obligatorio antes de enviar.",
     "uploadFiles": "Subir archivos",
     "uploadingFiles": "Subiendo archivos...",
     "templateDownload": "Descargar plantilla",
@@ -421,15 +465,18 @@
     "noFiles": "Aún no hay archivos subidos.",
     "otp": {
       "title": "Verifica el acceso",
-      "subtitle": "Solicita un código de un solo uso enviado a {email} e introdúcelo para continuar.",
+      "subtitle": "Abre tu buzón de correo para ver el código de verificación.",
       "requestCode": "Enviar código de verificación",
+      "resendCode": "Reenviar código de verificación",
       "requestingCode": "Enviando código...",
+      "cooldownLabel": "Reenviar código en {seconds}s",
       "codeLabel": "Código de verificación",
       "verify": "Verificar código",
       "verifying": "Verificando...",
-      "requested": "Código de verificación enviado.",
+      "requested": "Código de verificación enviado a {email}.",
       "verified": "Acceso verificado.",
       "failed": "No se pudo enviar el código de verificación.",
+      "cooldownError": "Espera antes de solicitar otro código de verificación.",
       "expired": "El código de verificación ha caducado. Solicita uno nuevo.",
       "attemptsExceeded": "Demasiados intentos fallidos. Solicita un nuevo código de verificación.",
       "notRequested": "Solicita primero un código de verificación.",
@@ -438,6 +485,10 @@
     "errors": {
       "validation": "Revisa los datos y archivos. Los requisitos obligatorios deben incluir al menos un archivo.",
       "missingMandatoryDocuments": "Faltan archivos en uno o más requisitos obligatorios.",
+      "missingRejectedDocuments": "Sube un archivo en cada documento rechazado antes de volver a enviar.",
+      "validationFieldsTitle": "Corrige estos campos",
+      "missingMandatoryDocumentsTitle": "Documentos obligatorios que faltan",
+      "missingRejectedDocumentsTitle": "Documentos rechazados pendientes de corrección",
       "expired": "Este enlace de proveedor ha caducado.",
       "notFound": "Este proveedor ya no está disponible.",
       "otpRequired": "Completa la verificación OTP para acceder al formulario de onboarding."

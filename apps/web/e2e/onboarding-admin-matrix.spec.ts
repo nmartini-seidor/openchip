@@ -13,16 +13,20 @@ test("admin can manage matrix configuration and it drives onboarding requirement
   await resetTestState(request);
   await loginAsAdmin(page);
 
-  await page.goto("/portal-settings");
-  await expect(page.getByText("Requirement Matrix")).toBeVisible();
+  await page.goto("/portal-settings?tab=matrix");
+  await expect(page.getByRole("heading", { name: "Requirement Matrix" })).toBeVisible();
+  const settingsTabsNav = page.getByRole("navigation", { name: "Portal settings sections" });
+  await settingsTabsNav.getByRole("link", { name: "Supplier Categories" }).click();
+  await expect(page).toHaveURL(/\/portal-settings\?tab=categories/);
 
   const uniqueSuffix = Date.now().toString().slice(-4);
   const newTypeLabel = `Strategic Partner ${uniqueSuffix}`;
   const newCategoryLabel = `Non-Subsidized / ${newTypeLabel} / National`;
+  let appliedFin03Level: "optional" | "not_applicable" = "not_applicable";
 
   await page.getByLabel("New supplier type label").fill(newTypeLabel);
   await page.getByRole("button", { name: "Add type" }).click();
-  await expect(page.locator("p").filter({ hasText: newTypeLabel }).first()).toBeVisible();
+  await expect(page.locator("tr").filter({ hasText: newTypeLabel }).first()).toBeVisible();
   await captureCheckpoint(page, testInfo, "admin-01-type-created");
 
   await page.locator("#categoryFunding").selectOption("non_subsidized");
@@ -31,20 +35,23 @@ test("admin can manage matrix configuration and it drives onboarding requirement
   await page.getByLabel("Display label").fill(newCategoryLabel);
   await page.getByRole("button", { name: "Add category" }).click();
 
-  const createdCategoryForm = page
-    .locator("form")
-    .filter({ has: page.getByText(newCategoryLabel) })
-    .first();
-  await expect(createdCategoryForm).toBeVisible();
-  const generatedCategoryCode = await createdCategoryForm.locator('input[name="categoryCode"]').inputValue();
+  const createdCategoryRow = page.locator("tr").filter({ has: page.getByText(newCategoryLabel) }).first();
+  await expect(createdCategoryRow).toBeVisible();
+  const generatedCategoryCode = (await createdCategoryRow.locator("td").first().innerText()).trim();
 
+  await settingsTabsNav.getByRole("link", { name: "Requirement Matrix" }).click();
+  await expect(page).toHaveURL(/\/portal-settings\?tab=matrix/);
   await page.locator("#selectedCategory").selectOption(generatedCategoryCode);
-  await page.getByRole("button", { name: "Load category" }).click();
+  await expect(page).toHaveURL(new RegExp(`/portal-settings\\?tab=matrix&category=${generatedCategoryCode}`));
 
   const fin03Row = page.locator("tr").filter({ has: page.getByText(/^FIN-03$/) }).first();
-  await fin03Row.getByLabel("Requirement level for FIN-03").selectOption("not_applicable");
-  await fin03Row.getByRole("button", { name: "Save" }).click();
-  await expect(fin03Row).toContainText("N/A");
+  const fin03Select = fin03Row.getByLabel("Requirement level for FIN-03");
+  const currentFin03Value = await fin03Select.inputValue();
+  const nextFin03Value = currentFin03Value === "optional" ? "not_applicable" : "optional";
+  appliedFin03Level = nextFin03Value;
+  await fin03Select.selectOption(nextFin03Value);
+  await page.getByRole("button", { name: "Save matrix changes" }).first().click();
+  await expect(fin03Select).toHaveValue(nextFin03Value);
   await captureCheckpoint(page, testInfo, "admin-02-matrix-updated");
 
   const supplierEmail = `admin-matrix-${uniqueSuffix}@example.com`;
@@ -59,7 +66,11 @@ test("admin can manage matrix configuration and it drives onboarding requirement
   await page.getByLabel("Supplier Category").selectOption(generatedCategoryCode);
 
   const previewFin03Row = page.locator("tr").filter({ has: page.getByText(/^FIN-03$/) }).first();
-  await expect(previewFin03Row).toContainText("N/A");
+  if (appliedFin03Level === "not_applicable") {
+    await expect(previewFin03Row).toContainText("N/A");
+  } else {
+    await expect(previewFin03Row).toContainText("Optional");
+  }
   await captureCheckpoint(page, testInfo, "admin-03-preview-checked");
 
   await page.getByRole("button", { name: /Create onboarding (case|supplier)|Crear proveedor de onboarding/i }).click();
@@ -70,6 +81,10 @@ test("admin can manage matrix configuration and it drives onboarding requirement
   await submitSupplierResponse(page, supplierUrl, caseId, supplierEmail);
 
   const caseDocumentRows = page.locator("tbody tr");
-  await expect(caseDocumentRows.filter({ has: page.getByText(/^FIN-03$/) })).toHaveCount(0);
+  if (appliedFin03Level === "not_applicable") {
+    await expect(caseDocumentRows.filter({ has: page.getByText(/^FIN-03$/) })).toHaveCount(0);
+  } else {
+    await expect(caseDocumentRows.filter({ has: page.getByText(/^FIN-03$/) })).toHaveCount(1);
+  }
   await captureCheckpoint(page, testInfo, "admin-04-case-documents-driven-by-matrix");
 });

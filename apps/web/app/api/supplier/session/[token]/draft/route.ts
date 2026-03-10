@@ -25,6 +25,19 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     return NextResponse.json({ message: "Invalid or expired session" }, { status: 404 });
   }
 
+  const onboardingCase = await onboardingRepository.getCase(session.caseId);
+  if (onboardingCase === null) {
+    return NextResponse.json({ message: "Case not found" }, { status: 404 });
+  }
+
+  const canEdit =
+    onboardingCase.status === "invitation_sent" ||
+    onboardingCase.status === "portal_accessed" ||
+    onboardingCase.status === "response_in_progress";
+  if (!canEdit) {
+    return NextResponse.json({ message: "Supplier response is closed" }, { status: 409 });
+  }
+
   const hasSession = await hasSupplierPortalSession(parsedToken.data, session.caseId);
   if (!hasSession || !session.otpVerified) {
     return NextResponse.json({ message: "OTP verification required" }, { status: 401 });
@@ -45,14 +58,23 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     return NextResponse.json({ message: "Invalid draft payload", issues: parsedInput.error.flatten() }, { status: 422 });
   }
 
-  const updatedCase = await onboardingRepository.saveSupplierDraft(
-    {
-      token: parsedInput.data.token,
-      address: omitUndefined(parsedInput.data.address),
-      bankAccount: omitUndefined(parsedInput.data.bankAccount)
-    },
-    "supplier.portal"
-  );
+  let updatedCase;
+  try {
+    updatedCase = await onboardingRepository.saveSupplierDraft(
+      {
+        token: parsedInput.data.token,
+        address: omitUndefined(parsedInput.data.address),
+        bankAccount: omitUndefined(parsedInput.data.bankAccount)
+      },
+      "supplier.portal"
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to save draft";
+    if (message.toLowerCase().includes("response is open")) {
+      return NextResponse.json({ message: "Supplier response is closed" }, { status: 409 });
+    }
+    return NextResponse.json({ message }, { status: 400 });
+  }
   return NextResponse.json({
     caseId: updatedCase.id,
     draftUpdatedAt: updatedCase.supplierDraft?.updatedAt ?? updatedCase.updatedAt

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
+import { Link2, Mail, Pencil, X } from "lucide-react";
 import { onboardingInitiatorRoles } from "@openchip/shared";
 import { evaluateCompliance } from "@openchip/workflow";
 import {
@@ -9,13 +10,14 @@ import {
   completeValidationAction,
   createSupplierInSapAction,
   resubmitRejectedDocumentsAction,
+  saveDocumentExpiryChangesAction,
   sendExpiryReminderAction,
   sendInvitationAction,
-  setDocumentExpiryAction,
   validateDocumentAction
 } from "@/app/actions";
 import { CaseToastHandler } from "@/components/case-toast-handler";
 import { CopyLinkButton } from "@/components/copy-link-button";
+import { DocumentExpirySaveButton } from "@/components/document-expiry-save-button";
 import { SectionCard } from "@/components/section-card";
 import { StatusBadge } from "@/components/status-badge";
 import { StatusTimeline } from "@/components/status-timeline";
@@ -45,6 +47,15 @@ function getSupplierInvalidSince(documents: { requirementLevel: string; validTo:
   return new Date(expiredMandatoryDates[0] ?? now).toISOString();
 }
 
+function isDocumentExpired(validTo: string | null): boolean {
+  if (validTo === null) {
+    return false;
+  }
+
+  const timestamp = new Date(validTo).getTime();
+  return Number.isFinite(timestamp) && timestamp < Date.now();
+}
+
 export default async function CaseDetailsPage({
   params
 }: {
@@ -72,6 +83,7 @@ export default async function CaseDetailsPage({
     onboardingCase.documents.length > 0
       ? onboardingCase.documents
       : await onboardingRepository.getRequirementSummary(onboardingCase.categoryCode);
+  const expiryFormId = `document-expiry-form-${onboardingCase.id}`;
 
   const complianceResult = evaluateCompliance(onboardingCase.documents);
   const supplierInvalidSince = getSupplierInvalidSince(onboardingCase.documents);
@@ -137,7 +149,8 @@ export default async function CaseDetailsPage({
     pending_validation: tCommon("documentStatus.pendingValidation"),
     approved: tCommon("documentStatus.approved"),
     rejected: tCommon("documentStatus.rejected"),
-    approved_provisionally: tCommon("documentStatus.approvedProvisionally")
+    approved_provisionally: tCommon("documentStatus.approvedProvisionally"),
+    expired: tCommon("documentStatus.expired")
   };
 
   const supplierPortalPath = onboardingCase.invitationToken !== null ? `/supplier/${onboardingCase.invitationToken}` : null;
@@ -152,14 +165,18 @@ export default async function CaseDetailsPage({
     { label: "Email", value: onboardingCase.supplierContactEmail, href: `mailto:${onboardingCase.supplierContactEmail}` },
     onboardingCase.supplierCountry !== null ? { label: tCase("metadata.supplierCountry"), value: onboardingCase.supplierCountry } : null,
     onboardingCase.supplierBankAccount !== null ? { label: tCase("metadata.bankCountry"), value: onboardingCase.supplierBankAccount.banks } : null,
-    onboardingCase.supplierBankAccount !== null ? { label: tCase("metadata.bankKey"), value: onboardingCase.supplierBankAccount.bankl } : null,
+    onboardingCase.supplierBankAccount !== null && onboardingCase.supplierBankAccount.bankl.trim().length > 0
+      ? { label: tCase("metadata.bankKey"), value: onboardingCase.supplierBankAccount.bankl }
+      : null,
     onboardingCase.supplierBankAccount?.iban !== null && onboardingCase.supplierBankAccount?.iban !== undefined
       ? { label: tCase("metadata.iban"), value: onboardingCase.supplierBankAccount.iban }
       : null,
     onboardingCase.supplierBankAccount?.bankn !== null && onboardingCase.supplierBankAccount?.bankn !== undefined
       ? { label: tCase("metadata.bankAccountNumber"), value: onboardingCase.supplierBankAccount.bankn }
       : null,
-    onboardingCase.supplierBankAccount?.bkont !== null && onboardingCase.supplierBankAccount?.bkont !== undefined
+    onboardingCase.supplierBankAccount?.bkont !== null &&
+    onboardingCase.supplierBankAccount?.bkont !== undefined &&
+    onboardingCase.supplierBankAccount.bkont.trim().length > 0
       ? { label: tCase("metadata.bankControlKey"), value: onboardingCase.supplierBankAccount.bkont }
       : null,
     onboardingCase.supplierBankAccount !== null ? { label: tCase("metadata.bankAccountName"), value: onboardingCase.supplierBankAccount.accname } : null,
@@ -184,9 +201,6 @@ export default async function CaseDetailsPage({
       <CaseToastHandler />
       <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-center">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            {tCommon("labels.case")} {onboardingCase.id}
-          </p>
           <div className="mt-1 flex flex-wrap items-start gap-2">
             <h2 className="text-2xl font-semibold text-slate-900">{onboardingCase.supplierName}</h2>
             {canEditSupplierInfo ? (
@@ -196,9 +210,7 @@ export default async function CaseDetailsPage({
                 aria-label={tCase("controls.editSupplierInfo")}
                 title={tCase("controls.editSupplierInfo")}
               >
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <path d="m13.5 3.5 3 3L7 16H4v-3z" />
-                </svg>
+                <Pencil aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
               </Link>
             ) : null}
           </div>
@@ -214,10 +226,7 @@ export default async function CaseDetailsPage({
               <SubmitButton
                 label={
                   <span className="inline-flex items-center gap-1.5">
-                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
-                      <path d="M3 5.5h14v9H3z" />
-                      <path d="m4 6 6 5 6-5" />
-                    </svg>
+                    <Mail aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />
                     {tCase("controls.sendInvitation")}
                   </span>
                 }
@@ -232,10 +241,7 @@ export default async function CaseDetailsPage({
               <SubmitButton
                 label={
                   <span className="inline-flex items-center gap-1.5">
-                    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.6">
-                      <path d="M3 5.5h14v9H3z" />
-                      <path d="m4 6 6 5 6-5" />
-                    </svg>
+                    <Mail aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />
                     {tCase("controls.sendExpiryReminder")}
                   </span>
                 }
@@ -251,16 +257,17 @@ export default async function CaseDetailsPage({
               successLabel={tCase("controls.magicLinkCopied")}
               className="rounded-full"
               icon={
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                  <path d="M8 6.5h6a2.5 2.5 0 0 1 0 5h-1" />
-                  <path d="M12 13.5H6a2.5 2.5 0 0 1 0-5h1" />
-                </svg>
+                <Link2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={1.8} />
               }
             />
           ) : null}
         </div>
       </div>
-      <WorkflowSwimlane status={onboardingCase.status} statusHistory={onboardingCase.statusHistory} />
+      <WorkflowSwimlane
+        status={onboardingCase.status}
+        statusHistory={onboardingCase.statusHistory}
+        sourceChannel={onboardingCase.sourceChannel}
+      />
 
       <div className="grid gap-5 xl:grid-cols-[2.2fr_1fr]">
         <div className="min-w-0 space-y-6">
@@ -343,95 +350,118 @@ export default async function CaseDetailsPage({
                   </tr>
                 </thead>
                 <tbody>
-                  {requirementSummary.map((document) => (
-                    <tr key={document.code} className="border-b border-[var(--border)]/70 align-top">
-                      <td className="py-2 pr-3 font-semibold text-slate-900">{document.code}</td>
-                      <td className="py-2 pr-3">
-                        <span
-                          className={
-                            requirementLevelClassName[document.requirementLevel] ??
-                            requirementLevelClassName.not_applicable
-                          }
-                        >
-                          {requirementLevelLabels[document.requirementLevel] ?? requirementLevelLabels.not_applicable}
-                        </span>
-                      </td>
-                      <td className="py-2 pr-3 whitespace-nowrap capitalize text-slate-700">
-                        {documentStatusLabels[document.status] ?? documentStatusLabels.approved_provisionally}
-                      </td>
-                      <td className="py-2 pr-3">
-                        {document.files.length > 0 ? (
-                          <ul className="space-y-1 text-xs">
-                            {document.files.map((file) => (
-                              <li key={file.id}>
-                                <a
-                                  href={`/api/cases/${onboardingCase.id}/documents/${document.code}/files/${file.id}`}
-                                  className="cursor-pointer text-[var(--primary)] hover:text-[var(--primary-strong)] hover:underline"
-                                >
-                                  {file.fileName}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <span className="text-xs text-slate-500">{tCase("requirements.noFiles")}</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-3">
-                        <form action={setDocumentExpiryAction} className="flex items-center gap-2">
-                          <input type="hidden" name="caseId" value={onboardingCase.id} />
-                          <input type="hidden" name="code" value={document.code} />
-                          <input
-                            type="date"
-                            name="validTo"
-                            defaultValue={document.validTo !== null ? document.validTo.slice(0, 10) : ""}
-                            className="oc-input oc-input-compact"
-                            aria-label={`Expiry for ${document.code}`}
-                          />
-                          <SubmitButton
-                            label={tCase("requirements.setExpiry")}
-                            pendingLabel={tCase("requirements.settingExpiry")}
-                            className="oc-btn oc-btn-secondary oc-btn-compact disabled:opacity-60"
-                          />
-                        </form>
-                      </td>
-                      <td className="py-2 pr-3 text-slate-600">{document.approver ?? "-"}</td>
-                      <td className="py-2 pr-3">
-                        {onboardingCase.status === "submission_completed" && document.files.length > 0 ? (
-                          <form action={validateDocumentAction} className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
-                            <input type="hidden" name="caseId" value={onboardingCase.id} />
-                            <input type="hidden" name="code" value={document.code} />
-                            <select
-                              name="decision"
-                              defaultValue="approve"
-                              aria-label={`Validation decision for ${document.code}`}
-                              className="oc-input oc-input-compact oc-select lg:w-44"
-                            >
-                              <option value="approve">{tCase("requirements.approve")}</option>
-                              <option value="reject">{tCase("requirements.reject")}</option>
-                              <option value="approve_provisionally">{tCase("requirements.approveProvisionally")}</option>
-                            </select>
-                            <input
-                              name="comments"
-                              defaultValue={tCase("requirements.defaultComment")}
-                              aria-label={`Validation comments for ${document.code}`}
-                              className="oc-input oc-input-compact min-w-0 lg:w-56"
-                            />
-                            <SubmitButton
-                              label={tCase("requirements.apply")}
-                              pendingLabel={tCase("requirements.applying")}
-                              className="oc-btn oc-btn-secondary oc-btn-compact disabled:opacity-60"
-                            />
-                          </form>
-                        ) : (
-                          <span className="text-xs text-slate-500">{tCase("requirements.noAction")}</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                  {requirementSummary.map((document) => {
+                    const expired = isDocumentExpired(document.validTo);
+                    const effectiveStatus = expired ? "expired" : document.status;
+                    const canEditValidTo = document.files.length > 0;
+                    return (
+                      <tr
+                        key={document.code}
+                        className={`border-b border-[var(--border)]/70 align-top ${expired ? "bg-rose-50/70" : ""}`}
+                      >
+                        <td className="py-2 pr-3 font-semibold text-slate-900">{document.code}</td>
+                        <td className="py-2 pr-3">
+                          <span
+                            className={
+                              requirementLevelClassName[document.requirementLevel] ??
+                              requirementLevelClassName.not_applicable
+                            }
+                          >
+                            {requirementLevelLabels[document.requirementLevel] ?? requirementLevelLabels.not_applicable}
+                          </span>
+                        </td>
+                        <td className={`py-2 pr-3 whitespace-nowrap capitalize ${expired ? "font-semibold text-rose-700" : "text-slate-700"}`}>
+                          {documentStatusLabels[effectiveStatus] ?? documentStatusLabels.approved_provisionally}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {canEditValidTo ? (
+                            <ul className="space-y-1 text-xs">
+                              {document.files.map((file) => (
+                                <li key={file.id}>
+                                  <a
+                                    href={`/api/cases/${onboardingCase.id}/documents/${document.code}/files/${file.id}`}
+                                    className="cursor-pointer text-[var(--primary)] hover:text-[var(--primary-strong)] hover:underline"
+                                  >
+                                    {file.fileName}
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-xs text-slate-500">{tCase("requirements.noFiles")}</span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-3">
+                          {canEditValidTo ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                form={expiryFormId}
+                                type="date"
+                                name={`validTo__${document.code}`}
+                                defaultValue={document.validTo !== null ? document.validTo.slice(0, 10) : ""}
+                                data-expiry-input="1"
+                                data-initial-value={document.validTo !== null ? document.validTo.slice(0, 10) : ""}
+                                className="oc-input oc-input-compact"
+                                aria-label={`Expiry for ${document.code}`}
+                              />
+                              <input
+                                form={expiryFormId}
+                                type="hidden"
+                                name={`initialValidTo__${document.code}`}
+                                value={document.validTo !== null ? document.validTo.slice(0, 10) : ""}
+                              />
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-3 text-slate-600">{document.approver ?? "-"}</td>
+                        <td className="py-2 pr-3">
+                          {onboardingCase.status === "submission_completed" && document.files.length > 0 ? (
+                            <form action={validateDocumentAction} className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+                              <input type="hidden" name="caseId" value={onboardingCase.id} />
+                              <input type="hidden" name="code" value={document.code} />
+                              <select
+                                name="decision"
+                                defaultValue="approve"
+                                aria-label={`Validation decision for ${document.code}`}
+                                className="oc-input oc-input-compact oc-select lg:w-44"
+                              >
+                                <option value="approve">{tCase("requirements.approve")}</option>
+                                <option value="reject">{tCase("requirements.reject")}</option>
+                                <option value="approve_provisionally">{tCase("requirements.approveProvisionally")}</option>
+                              </select>
+                              <input
+                                name="comments"
+                                defaultValue={tCase("requirements.defaultComment")}
+                                aria-label={`Validation comments for ${document.code}`}
+                                className="oc-input oc-input-compact min-w-0 lg:w-56"
+                              />
+                              <SubmitButton
+                                label={tCase("requirements.apply")}
+                                pendingLabel={tCase("requirements.applying")}
+                                className="oc-btn oc-btn-secondary oc-btn-compact disabled:opacity-60"
+                              />
+                            </form>
+                          ) : (
+                            <span className="text-xs text-slate-500">{tCase("requirements.noAction")}</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
+            <form id={expiryFormId} action={saveDocumentExpiryChangesAction} className="mt-4 flex justify-end">
+              <input type="hidden" name="caseId" value={onboardingCase.id} />
+              <DocumentExpirySaveButton
+                formId={expiryFormId}
+                label={tCase("requirements.saveSupplier")}
+                pendingLabel={tCase("requirements.savingSupplier")}
+                className="oc-btn oc-btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+              />
+            </form>
             {onboardingCase.status === "submission_completed" ? (
               <div className="mt-4 flex justify-end">
                 <form action={approveAllMandatoryAction}>
@@ -448,13 +478,11 @@ export default async function CaseDetailsPage({
           </SectionCard>
 
           {canCancelCase ? (
-            <details className="group">
-              <summary className="oc-btn oc-btn-danger list-none">
-                <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <path d="M6 6 14 14M14 6l-8 8" />
-                </svg>
-                {tCase("controls.cancelCase")}
-              </summary>
+          <details className="group">
+            <summary className="oc-btn oc-btn-danger list-none">
+              <X aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
+              {tCase("controls.cancelCase")}
+            </summary>
               <form action={cancelCaseAction} className="mt-2 grid gap-2 rounded-md border border-rose-200 bg-rose-50 p-3">
                 <input type="hidden" name="caseId" value={onboardingCase.id} />
                 <label htmlFor="cancelReason" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">

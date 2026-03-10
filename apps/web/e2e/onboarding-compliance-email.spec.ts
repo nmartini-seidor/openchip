@@ -3,6 +3,8 @@ import { assertEmailContains } from "./utils/mail-client";
 import {
   approveAllMandatory,
   captureCheckpoint,
+  completeValidation,
+  createSupplierInSap,
   createCaseViaUi,
   createUniqueVat,
   loginAsFinance,
@@ -15,8 +17,9 @@ test("expired mandatory document enables PO block", async ({ page, request }, te
   await resetTestState(request);
   await loginAsFinance(page);
 
+  const supplierName = "Proveedor Expiry";
   const caseId = await createCaseViaUi(page, {
-    supplierName: "Proveedor Expiry",
+    supplierName,
     supplierVat: createUniqueVat("EXPIRY"),
     supplierContactName: "Expiry Tester",
     supplierContactEmail: "expiry@example.com",
@@ -27,6 +30,8 @@ test("expired mandatory document enables PO block", async ({ page, request }, te
   const supplierUrl = await sendInvitationFromCase(page);
   await submitSupplierResponse(page, supplierUrl, caseId, "expiry@example.com");
   await approveAllMandatory(page);
+  await completeValidation(page);
+  await createSupplierInSap(page);
 
   const setExpiryResponse = await request.post(`/api/test/cases/${caseId}/set-document-expiry`, {
     data: {
@@ -41,6 +46,13 @@ test("expired mandatory document enables PO block", async ({ page, request }, te
   await page.reload();
   await expect(page.getByText("PO Block:", { exact: false })).toBeVisible();
   await expect(page.getByText("Enabled", { exact: true })).toBeVisible();
+  const expiredRow = page.locator("tr", { has: page.getByText("FIN-01", { exact: true }) });
+  await expect(expiredRow).toContainText("expired");
+  await expect(expiredRow).toHaveClass(/bg-rose-50\/70/);
+
+  await page.goto("/");
+  const overviewRow = page.locator("tr", { has: page.getByText(supplierName, { exact: true }) });
+  await expect(overviewRow.getByText("Non-Compliant", { exact: true })).toBeVisible();
 
   await captureCheckpoint(page, testInfo, "po-block-enabled");
 });

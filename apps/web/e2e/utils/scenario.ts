@@ -124,10 +124,17 @@ export async function submitSupplierResponse(
   _supplierContactEmail: string
 ): Promise<void> {
   await page.goto(supplierUrl);
-  await Promise.all([
-    page.waitForURL(/otp=(requested|failed)/),
-    page.getByRole("button", { name: /Send verification code|Enviar código de verificación/ }).click()
-  ]);
+  if (!/[?&]otp=requested(?:&|$)/.test(page.url())) {
+    const sendCodeButton = page.getByRole("button", {
+      name: /Send verification code|Enviar código de verificación|Resend verification code|Reenviar código de verificación/
+    });
+    if ((await sendCodeButton.count()) > 0 && (await sendCodeButton.isEnabled())) {
+      await Promise.all([
+        page.waitForURL(/otp=(requested|failed)|otpError=/),
+        sendCodeButton.click()
+      ]);
+    }
+  }
   const otpCode = await fetchOtpCodeForSupplier(page, supplierUrl);
   await page.getByLabel(/Verification code|Código de verificación/).fill(otpCode);
   await Promise.all([
@@ -150,8 +157,7 @@ export async function submitSupplierResponse(
   await page.locator("#banks").fill("Spain");
   await page.keyboard.press("Enter");
 
-  await page.getByLabel(/Bank key|Clave banco/).fill("2100");
-  await page.getByLabel(/IBAN/).fill("ES9121000418450200051332");
+  await page.getByLabel(/IBAN|número de cuenta bancaria|bank account number/i).fill("ES9121000418450200051332");
   await page.getByLabel(/Bank account holder name|Titular de la cuenta bancaria/).fill("Proveedor Demo SL");
 
   const requirementSections = page.locator("aside section");
@@ -175,7 +181,7 @@ export async function submitSupplierResponse(
     await expect(section.getByRole("link", { name: fileName })).toBeVisible();
   }
 
-  await page.getByRole("button", { name: /Submit supplier response|Enviar respuesta/ }).click();
+  await page.getByRole("button", { name: /Submit Response|Enviar respuesta/ }).click();
 
   await expect(page).toHaveURL(new RegExp(`/supplier/.+\?submitted=1$`));
   await page.goto(`/cases/${caseId}`);

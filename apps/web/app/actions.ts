@@ -14,6 +14,7 @@ import {
   invitationTokenSchema,
   onboardingInitiatorRoles,
   portalSettingsSchema,
+  requirementLevelSchema,
   requirementMatrixUpdateSchema,
   supplierCategoryCreateSchema,
   supplierCategoryStatusSchema,
@@ -32,13 +33,13 @@ import { evaluateCompliance } from "@openchip/workflow";
 import { actorFromSession, requireSessionRole, requireSessionUser } from "@/lib/auth";
 import { saveDocumentTemplate } from "@/lib/document-storage";
 import { getEmailAdapter } from "@/lib/email";
+import { sendSupplierInvitation } from "@/lib/invitation";
 import { onboardingRepository } from "@/lib/repository";
 import {
   clearSupplierPortalSession,
   createSupplierPortalSession,
   hasSupplierPortalSession
 } from "@/lib/supplier-session";
-import { triggerCaseWorkflows } from "@/lib/workflow-runner";
 
 function readFormValue(formData: FormData, key: string): string {
   const value = formData.get(key);
@@ -82,8 +83,59 @@ function hasRole(role: InternalRole, allowedRoles: readonly InternalRole[]): boo
   return allowedRoles.includes(role);
 }
 
-function getAppBaseUrl(): string {
-  return process.env.APP_BASE_URL ?? "http://127.0.0.1:3005";
+function buildSupplierSubmitErrorHref(
+  token: string,
+  error: string,
+  details: { fields?: string[]; docs?: string[] } = {}
+): string {
+  const params = new URLSearchParams();
+  params.set("error", error);
+  if (details.fields !== undefined && details.fields.length > 0) {
+    params.set("fields", details.fields.join(","));
+  }
+  if (details.docs !== undefined && details.docs.length > 0) {
+    params.set("docs", details.docs.join(","));
+  }
+  return `/supplier/${token}?${params.toString()}`;
+}
+
+function getSupplierPortalLink(token: string): string {
+  const appBaseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+  return new URL(`/supplier/${token}`, appBaseUrl).toString();
+}
+
+function collectSupplierValidationFields(paths: ReadonlyArray<readonly (string | number)[]>): string[] {
+  const allowedFields = new Set([
+    "street",
+    "city",
+    "postalCode",
+    "country",
+    "banks",
+    "bankn",
+    "accname",
+    "iban"
+  ]);
+  const discoveredFields = new Set<string>();
+
+  for (const path of paths) {
+    if (path.length === 0) {
+      continue;
+    }
+
+    let candidate: string | null = null;
+    if ((path[0] === "address" || path[0] === "bankAccount") && typeof path[1] === "string") {
+      candidate = path[1];
+    } else if (typeof path[0] === "string") {
+      candidate = path[0];
+    }
+
+    if (candidate !== null && allowedFields.has(candidate)) {
+      discoveredFields.add(candidate);
+    }
+  }
+
+  const fieldOrder = ["street", "city", "postalCode", "country", "banks", "bankn", "accname", "iban"] as const;
+  return fieldOrder.filter((field) => discoveredFields.has(field));
 }
 
 export async function createCaseAction(formData: FormData): Promise<void> {
@@ -156,26 +208,7 @@ export async function sendInvitationAction(formData: FormData): Promise<void> {
   const user = await requireSessionRole(onboardingInitiatorRoles);
 
   const caseId = identifierSchema.parse(readFormValue(formData, "caseId"));
-  const onboardingCase = await onboardingRepository.sendInvitation(caseId, actorFromSession(user));
-
-  if (onboardingCase.invitationToken !== null && onboardingCase.invitationExpiresAt !== null) {
-    const emailAdapter = getEmailAdapter();
-    const invitationLink = new URL(`/supplier/${onboardingCase.invitationToken}`, getAppBaseUrl()).toString();
-
-    await emailAdapter.sendInvitationEmail({
-      to: onboardingCase.supplierContactEmail,
-      supplierName: onboardingCase.supplierName,
-      invitationLink,
-      expiresAt: onboardingCase.invitationExpiresAt
-    });
-
-    await triggerCaseWorkflows({
-      caseId,
-      actor: actorFromSession(user),
-      invitationOpenDeadlineAt: onboardingCase.invitationOpenDeadlineAt,
-      onboardingCompletionDeadlineAt: onboardingCase.onboardingCompletionDeadlineAt
-    });
-  }
+  await sendSupplierInvitation(caseId, actorFromSession(user));
 
   revalidatePath(`/cases/${caseId}`);
   revalidatePath("/");
@@ -206,7 +239,7 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
     bankAccount: {
       bkvid: readFormValueOrEmpty(formData, "bkvid"),
       banks: readFormValueOrEmpty(formData, "banks"),
-      bankl: readFormValueOrEmpty(formData, "bankl"),
+      bankl: readOptionalFormValue(formData, "bankl"),
       bankn: readOptionalFormValue(formData, "bankn"),
       bkont: readOptionalFormValue(formData, "bkont"),
       accname: readFormValueOrEmpty(formData, "accname"),
@@ -218,7 +251,8 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
   });
 
   if (!baseSubmission.success) {
-    redirect(`/supplier/${token}?error=validation`);
+    const invalidFields = collectSupplierValidationFields(baseSubmission.error.issues.map((issue) => issue.path));
+    redirect(buildSupplierSubmitErrorHref(token, "validation", { fields: invalidFields }));
   }
 
   const onboardingCase = await onboardingRepository.getCase(session.caseId);
@@ -226,24 +260,53 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
     redirect(`/supplier/${token}?error=not-found`);
   }
 
-  const payload = supplierSubmissionSchema.safeParse({
-    token,
-    address: baseSubmission.data.address,
-    bankAccount: baseSubmission.data.bankAccount,
-    uploadedDocuments: []
-  });
+  const requirements = await onboardingRepository.getRequirementPreview(onboardingCase.categoryCode);
+  const uploadedDocuments = onboardingCase.supplierDraft?.uploadedDocuments ?? [];
+  const uploadedByCode = new Map(uploadedDocuments.map((entry) => [entry.code, entry.files.length]));
+  const existingDocumentsByCode = new Map(onboardingCase.documents.map((document) => [document.code, document.files.length]));
+  const missingMandatoryDocumentCodes = requirements
+    .filter((row) => row.requirementLevel === "mandatory")
+    .filter((row) => (uploadedByCode.get(row.code) ?? 0) + (existingDocumentsByCode.get(row.code) ?? 0) === 0)
+    .map((row) => row.code);
 
-  if (!payload.success) {
-    redirect(`/supplier/${token}?error=validation`);
+  if (missingMandatoryDocumentCodes.length > 0) {
+    redirect(buildSupplierSubmitErrorHref(token, "missing-mandatory-documents", { docs: missingMandatoryDocumentCodes }));
+  }
+
+  const missingRejectedDocumentCodes = onboardingCase.documents
+    .filter((document) => document.status === "rejected")
+    .filter((document) => (uploadedByCode.get(document.code) ?? 0) === 0)
+    .map((document) => document.code);
+
+  if (missingRejectedDocumentCodes.length > 0) {
+    redirect(buildSupplierSubmitErrorHref(token, "missing-rejected-documents", { docs: missingRejectedDocumentCodes }));
   }
 
   try {
-    const updatedCase = await onboardingRepository.submitSupplierResponse(payload.data, "supplier.portal");
-    revalidatePath(`/supplier/${payload.data.token}`);
+    const updatedCase = await onboardingRepository.submitSupplierResponse(
+      {
+        token,
+        address: baseSubmission.data.address,
+        bankAccount: baseSubmission.data.bankAccount,
+        uploadedDocuments: []
+      },
+      "supplier.portal"
+    );
+    revalidatePath(`/supplier/${token}`);
     revalidatePath(`/cases/${updatedCase.id}`);
     revalidatePath("/");
-  } catch {
-    redirect(`/supplier/${token}?error=missing-mandatory-documents`);
+  } catch (error) {
+    if (error instanceof Error) {
+      const missingRequirementMatch = error.message.match(/Mandatory requirement\s+([A-Z0-9-]+)\s+is missing/i);
+      if (missingRequirementMatch?.[1] !== undefined) {
+        redirect(buildSupplierSubmitErrorHref(token, "missing-mandatory-documents", { docs: [missingRequirementMatch[1]] }));
+      }
+      const rejectedRequirementMatch = error.message.match(/Rejected requirement\s+([A-Z0-9-]+)\s+is missing/i);
+      if (rejectedRequirementMatch?.[1] !== undefined) {
+        redirect(buildSupplierSubmitErrorHref(token, "missing-rejected-documents", { docs: [rejectedRequirementMatch[1]] }));
+      }
+    }
+    redirect(buildSupplierSubmitErrorHref(token, "validation"));
   }
 
   redirect(`/supplier/${token}?submitted=1`);
@@ -260,16 +323,24 @@ export async function requestSupplierOtpAction(formData: FormData): Promise<void
     redirect(`/supplier/${parsed.token}?error=expired`);
   }
 
+  const onboardingCase = await onboardingRepository.getCase(session.caseId);
+  if (onboardingCase !== null && onboardingCase.supplierOtpState.requestedAt !== null) {
+    const elapsedSeconds = Math.floor((Date.now() - new Date(onboardingCase.supplierOtpState.requestedAt).getTime()) / 1000);
+    if (Number.isFinite(elapsedSeconds) && elapsedSeconds < 60) {
+      redirect(`/supplier/${parsed.token}?otpError=cooldown`);
+    }
+  }
+
   try {
-    const onboardingCase = await onboardingRepository.requestSupplierOtp(parsed, "supplier.portal");
-    if (onboardingCase.supplierOtpState.code !== null && onboardingCase.supplierOtpState.expiresAt !== null) {
+    const updatedCase = await onboardingRepository.requestSupplierOtp(parsed, "supplier.portal");
+    if (updatedCase.supplierOtpState.code !== null && updatedCase.supplierOtpState.expiresAt !== null) {
       try {
         const emailAdapter = getEmailAdapter();
         await emailAdapter.sendSupplierOtpEmail({
           to: session.supplierContactEmail,
-          supplierName: onboardingCase.supplierName,
-          otpCode: onboardingCase.supplierOtpState.code,
-          expiresAt: onboardingCase.supplierOtpState.expiresAt
+          supplierName: updatedCase.supplierName,
+          otpCode: updatedCase.supplierOtpState.code,
+          expiresAt: updatedCase.supplierOtpState.expiresAt
         });
       } catch {
         // Keep OTP flow available even if email delivery channel is temporarily unavailable.
@@ -366,7 +437,31 @@ export async function validateDocumentAction(formData: FormData): Promise<void> 
     comments: readFormValue(formData, "comments")
   });
 
-  await onboardingRepository.validateDocument(payload);
+  const updatedCase = await onboardingRepository.validateDocument(payload);
+  if (payload.decision === "reject") {
+    await onboardingRepository.recordCaseAction(
+      payload.caseId,
+      payload.approver,
+      "supplier_rework_requested",
+      `Supplier correction requested for document ${payload.code}`
+    );
+
+    if (updatedCase.invitationToken !== null) {
+      try {
+        const emailAdapter = getEmailAdapter();
+        await emailAdapter.sendDocumentRejectedEmail({
+          to: updatedCase.supplierContactEmail,
+          supplierName: updatedCase.supplierName,
+          invitationLink: getSupplierPortalLink(updatedCase.invitationToken),
+          documentCodes: [payload.code]
+        });
+      } catch {
+        // Keep validation flow available if supplier notification email fails.
+      }
+      revalidatePath(`/supplier/${updatedCase.invitationToken}`);
+    }
+    revalidatePath("/");
+  }
   revalidatePath(`/cases/${payload.caseId}`);
 }
 
@@ -495,6 +590,69 @@ export async function setDocumentExpiryAction(formData: FormData): Promise<void>
   revalidatePath(`/cases/${caseId}`);
 }
 
+export async function saveDocumentExpiryChangesAction(formData: FormData): Promise<void> {
+  const user = await requireSessionUser();
+  if (!hasRole(user.role, ["finance", "compliance", "admin"])) {
+    throw new Error("You do not have permission to set document expiry.");
+  }
+
+  const caseId = identifierSchema.parse(readFormValue(formData, "caseId"));
+  const actor = actorFromSession(user);
+  const expiryUpdates: { code: DocumentCode; validTo: string | null }[] = [];
+
+  for (const [key, rawValue] of formData.entries()) {
+    if (!key.startsWith("validTo__") || typeof rawValue !== "string") {
+      continue;
+    }
+
+    const codeRaw = key.slice("validTo__".length);
+    const code = parseDocumentCode(codeRaw);
+    const initialKey = `initialValidTo__${codeRaw}`;
+    const initialRaw = formData.get(initialKey);
+    const initialValue = typeof initialRaw === "string" && initialRaw.trim().length > 0 ? initialRaw.trim() : null;
+    const nextValue = rawValue.trim().length > 0 ? rawValue.trim() : null;
+
+    if (initialValue === nextValue) {
+      continue;
+    }
+
+    expiryUpdates.push({ code, validTo: nextValue });
+  }
+
+  if (expiryUpdates.length === 0) {
+    redirect(`/cases/${caseId}`);
+  }
+
+  const onboardingCase = await onboardingRepository.getCase(caseId);
+  if (onboardingCase === null) {
+    throw new Error("Case not found.");
+  }
+
+  const editableDocumentCodes = new Set(
+    onboardingCase.documents
+      .filter((document) => document.files.length > 0)
+      .map((document) => document.code)
+  );
+
+  const safeUpdates = expiryUpdates.filter((update) => editableDocumentCodes.has(update.code));
+  if (safeUpdates.length === 0) {
+    redirect(`/cases/${caseId}`);
+  }
+
+  for (const update of safeUpdates) {
+    await onboardingRepository.setDocumentExpiry(caseId, update.code, update.validTo, actor);
+  }
+
+  const note = `Updated expiry for ${safeUpdates.length} document(s): ${safeUpdates
+    .map((update) => `${update.code}=${update.validTo ?? "clear"}`)
+    .join(", ")}`;
+  await onboardingRepository.recordCaseAction(caseId, actor, "document_expiry_updated", note);
+
+  revalidatePath(`/cases/${caseId}`);
+  revalidatePath("/");
+  redirect(`/cases/${caseId}?toast=document_expiry_updated`);
+}
+
 export async function upsertUserAction(formData: FormData): Promise<void> {
   const user = await requireSessionRole(["admin"]);
 
@@ -581,12 +739,57 @@ export async function updateRequirementMatrixAction(formData: FormData): Promise
   revalidatePath("/cases/new");
 }
 
+export async function saveRequirementMatrixChangesAction(formData: FormData): Promise<void> {
+  const user = await requireSessionRole(["admin"]);
+
+  const categoryCode = readFormValue(formData, "categoryCode");
+  const actor = actorFromSession(user);
+  const changes: { documentCode: string; requirementLevel: "mandatory" | "optional" | "not_applicable" }[] = [];
+
+  for (const [key, rawValue] of formData.entries()) {
+    if (!key.startsWith("requirementLevel__") || typeof rawValue !== "string") {
+      continue;
+    }
+
+    const documentCode = key.slice("requirementLevel__".length);
+    const initialKey = `initialRequirementLevel__${documentCode}`;
+    const initialRaw = formData.get(initialKey);
+    const initialValue = typeof initialRaw === "string" ? initialRaw : "";
+    const nextValue = requirementLevelSchema.parse(rawValue);
+
+    if (initialValue === nextValue) {
+      continue;
+    }
+
+    changes.push({ documentCode, requirementLevel: nextValue });
+  }
+
+  if (changes.length > 0) {
+    for (const change of changes) {
+      const parsed = requirementMatrixUpdateSchema.parse({
+        categoryCode,
+        documentCode: change.documentCode,
+        requirementLevel: change.requirementLevel
+      });
+      await onboardingRepository.updateRequirementMatrixEntry(parsed, actor);
+    }
+  }
+
+  revalidatePath("/portal-settings");
+  revalidatePath("/cases/new");
+  redirect(`/portal-settings?tab=matrix&category=${encodeURIComponent(categoryCode)}`);
+}
+
 export async function updatePortalSettingsAction(formData: FormData): Promise<void> {
   const user = await requireSessionRole(["admin"]);
 
   const parsed = portalSettingsSchema.parse({
     invitationOpenHours: readFormValue(formData, "invitationOpenHours"),
-    onboardingCompletionDays: readFormValue(formData, "onboardingCompletionDays")
+    onboardingCompletionDays: readFormValue(formData, "onboardingCompletionDays"),
+    sapBaseUrl: readFormValue(formData, "sapBaseUrl"),
+    sapApiKey: readFormValue(formData, "sapApiKey"),
+    docuwareBaseUrl: readFormValue(formData, "docuwareBaseUrl"),
+    docuwareApiKey: readFormValue(formData, "docuwareApiKey")
   });
 
   await onboardingRepository.updatePortalSettings(parsed, actorFromSession(user));

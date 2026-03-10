@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { CheckCircle2, Circle, Download, LoaderCircle, TriangleAlert } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { UploadedDocumentFile } from "@openchip/shared";
 import type { CountryOption } from "@/lib/countries";
 import { FilterableCountrySelect } from "@/components/filterable-country-select";
@@ -23,14 +24,13 @@ interface SupplierOnboardingFormLabels {
   bankSectionTitle: string;
   bankSectionSubtitle: string;
   banks: string;
-  bankl: string;
-  iban: string;
-  bankn: string;
-  bkont: string;
+  ibanOrAccountNumber: string;
+  ibanInvalid: string;
+  ibanValid: string;
   accname: string;
-  saveDraft: string;
-  savingDraft: string;
-  draftSaved: string;
+  autoSaveIdle: string;
+  autoSaving: string;
+  autoSaved: string;
   draftSaveError: string;
   requiredDocsTitle: string;
   requiredDocsSubtitle: string;
@@ -40,6 +40,8 @@ interface SupplierOnboardingFormLabels {
   noTemplate: string;
   uploadedFiles: string;
   noFiles: string;
+  missingMandatoryTitle: string;
+  missingMandatoryHint: string;
 }
 
 interface SupplierDraftInitialValue {
@@ -51,9 +53,7 @@ interface SupplierDraftInitialValue {
   };
   bankAccount: {
     banks?: string;
-    bankl?: string;
     bankn?: string;
-    bkont?: string;
     accname?: string;
     iban?: string;
   };
@@ -65,30 +65,68 @@ interface SupplierOnboardingFormProps {
   countries: CountryOption[];
   requirements: SupplierRequirementView[];
   initialDraft: SupplierDraftInitialValue;
+  initialMissingDocumentCodes?: string[];
 }
 
 type UploadStatus = "idle" | "uploading" | "error";
 type DraftStatus = "idle" | "saving" | "saved" | "error";
+type IbanValidationState = "empty" | "account_number" | "valid" | "invalid";
+
+function normalizeIbanInput(value: string): string {
+  return value.replace(/\s+/g, "").toUpperCase();
+}
+
+function isLikelyIban(value: string): boolean {
+  const normalized = normalizeIbanInput(value);
+  return /^[A-Z]{2}\d{2}[A-Z0-9]{6,30}$/.test(normalized);
+}
+
+function isValidIbanChecksum(value: string): boolean {
+  const normalized = normalizeIbanInput(value);
+  if (!/^[A-Z]{2}[0-9]{2}[A-Z0-9]{8,30}$/.test(normalized)) {
+    return false;
+  }
+
+  const rearranged = `${normalized.slice(4)}${normalized.slice(0, 4)}`;
+  let remainder = 0;
+  for (const character of rearranged) {
+    const numericChunk =
+      character >= "A" && character <= "Z"
+        ? (character.charCodeAt(0) - 55).toString()
+        : character;
+
+    for (const digit of numericChunk) {
+      remainder = (remainder * 10 + Number(digit)) % 97;
+    }
+  }
+
+  return remainder === 1;
+}
 
 export function SupplierOnboardingForm({
   token,
   labels,
   countries,
   requirements,
-  initialDraft
+  initialDraft,
+  initialMissingDocumentCodes = []
 }: SupplierOnboardingFormProps) {
   const [street, setStreet] = useState(initialDraft.address.street ?? "");
   const [city, setCity] = useState(initialDraft.address.city ?? "");
   const [postalCode, setPostalCode] = useState(initialDraft.address.postalCode ?? "");
   const [country, setCountry] = useState(initialDraft.address.country ?? "");
   const [banks, setBanks] = useState(initialDraft.bankAccount.banks ?? "");
-  const [bankl, setBankl] = useState(initialDraft.bankAccount.bankl ?? "");
-  const [iban, setIban] = useState(initialDraft.bankAccount.iban ?? "");
-  const [bankn, setBankn] = useState(initialDraft.bankAccount.bankn ?? "");
-  const [bkont, setBkont] = useState(initialDraft.bankAccount.bkont ?? "");
+  const [bankAccountValue, setBankAccountValue] = useState(
+    initialDraft.bankAccount.iban ?? initialDraft.bankAccount.bankn ?? ""
+  );
   const [accname, setAccname] = useState(initialDraft.bankAccount.accname ?? "");
   const [draftStatus, setDraftStatus] = useState<DraftStatus>("idle");
-  const [activeRequirementCode, setActiveRequirementCode] = useState<string>(requirements[0]?.code ?? "");
+  const [activeRequirementCode, setActiveRequirementCode] = useState<string>(() => {
+    const preferredCode = initialMissingDocumentCodes.find((code) =>
+      requirements.some((requirement) => requirement.code === code)
+    );
+    return preferredCode ?? requirements[0]?.code ?? "";
+  });
   const [uploadStatusByCode, setUploadStatusByCode] = useState<Record<string, UploadStatus>>({});
   const [filesByCode, setFilesByCode] = useState<Record<string, UploadedDocumentFile[]>>(() => {
     const initial: Record<string, UploadedDocumentFile[]> = {};
@@ -97,8 +135,55 @@ export function SupplierOnboardingForm({
     }
     return initial;
   });
+  const saveInFlightRef = useRef(false);
+  const queuedSaveRef = useRef<{ payload: SupplierDraftInitialValue; serialized: string } | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const clearSavedStatusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSaveDraft = useCallback(async () => {
+  const draftPayload = useMemo(
+    () => ({
+      address: {
+        street,
+        city,
+        postalCode,
+        country
+      },
+      bankAccount: {
+        banks,
+        bankn: isLikelyIban(bankAccountValue) ? "" : bankAccountValue.trim(),
+        accname,
+        iban: isLikelyIban(bankAccountValue) ? normalizeIbanInput(bankAccountValue) : ""
+      }
+    }),
+    [accname, bankAccountValue, banks, city, country, postalCode, street]
+  );
+
+  const initialSerializedPayloadRef = useRef(JSON.stringify(draftPayload));
+  const lastSavedSerializedPayloadRef = useRef(initialSerializedPayloadRef.current);
+  const serializedDraftPayload = useMemo(() => JSON.stringify(draftPayload), [draftPayload]);
+
+  const markSaved = useCallback(() => {
+    setDraftStatus("saved");
+    if (clearSavedStatusTimerRef.current !== null) {
+      clearTimeout(clearSavedStatusTimerRef.current);
+    }
+    clearSavedStatusTimerRef.current = setTimeout(() => {
+      setDraftStatus((current) => (current === "saved" ? "idle" : current));
+    }, 1800);
+  }, []);
+
+  const handleSaveDraft = useCallback(async (payload: SupplierDraftInitialValue, serialized: string) => {
+    if (serialized === lastSavedSerializedPayloadRef.current) {
+      markSaved();
+      return;
+    }
+
+    if (saveInFlightRef.current) {
+      queuedSaveRef.current = { payload, serialized };
+      return;
+    }
+
+    saveInFlightRef.current = true;
     setDraftStatus("saving");
     try {
       const response = await fetch(`/api/supplier/session/${token}/draft`, {
@@ -106,33 +191,26 @@ export function SupplierOnboardingForm({
         headers: {
           "content-type": "application/json"
         },
-        body: JSON.stringify({
-          address: {
-            street,
-            city,
-            postalCode,
-            country
-          },
-          bankAccount: {
-            banks,
-            bankl,
-            bankn,
-            bkont,
-            accname,
-            iban
-          }
-        })
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
         throw new Error("Draft save failed");
       }
 
-      setDraftStatus("saved");
+      lastSavedSerializedPayloadRef.current = serialized;
+      markSaved();
     } catch {
       setDraftStatus("error");
+    } finally {
+      saveInFlightRef.current = false;
+      const queued = queuedSaveRef.current;
+      queuedSaveRef.current = null;
+      if (queued !== null) {
+        void handleSaveDraft(queued.payload, queued.serialized);
+      }
     }
-  }, [accname, bankl, bankn, banks, bkont, city, country, iban, postalCode, street, token]);
+  }, [markSaved, token]);
 
   const handleUpload = useCallback(
     async (code: string, fileList: FileList | null) => {
@@ -140,6 +218,7 @@ export function SupplierOnboardingForm({
         return;
       }
 
+      setDraftStatus("saving");
       setUploadStatusByCode((current) => ({ ...current, [code]: "uploading" }));
       const payload = new FormData();
       payload.set("code", code);
@@ -167,33 +246,128 @@ export function SupplierOnboardingForm({
           [data.code]: [...(current[data.code] ?? []), ...data.files]
         }));
         setUploadStatusByCode((current) => ({ ...current, [code]: "idle" }));
+        void handleSaveDraft(draftPayload, serializedDraftPayload);
       } catch {
         setUploadStatusByCode((current) => ({ ...current, [code]: "error" }));
+        setDraftStatus("error");
       }
     },
-    [token]
+    [draftPayload, handleSaveDraft, serializedDraftPayload, token]
   );
+
+  useEffect(() => {
+    if (serializedDraftPayload === lastSavedSerializedPayloadRef.current) {
+      return;
+    }
+
+    if (autoSaveTimerRef.current !== null) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      void handleSaveDraft(draftPayload, serializedDraftPayload);
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [draftPayload, handleSaveDraft, serializedDraftPayload]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimerRef.current !== null) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+      if (clearSavedStatusTimerRef.current !== null) {
+        clearTimeout(clearSavedStatusTimerRef.current);
+      }
+    };
+  }, []);
 
   const draftStatusText = useMemo(() => {
     if (draftStatus === "saving") {
-      return labels.savingDraft;
+      return labels.autoSaving;
     }
     if (draftStatus === "saved") {
-      return labels.draftSaved;
+      return labels.autoSaved;
     }
     if (draftStatus === "error") {
       return labels.draftSaveError;
     }
-    return "";
-  }, [draftStatus, labels.draftSaveError, labels.draftSaved, labels.savingDraft]);
+    return labels.autoSaveIdle;
+  }, [draftStatus, labels.autoSaveIdle, labels.autoSaved, labels.autoSaving, labels.draftSaveError]);
+
+  const ibanValidation = useMemo<IbanValidationState>(() => {
+    const trimmed = bankAccountValue.trim();
+    if (trimmed.length === 0) {
+      return "empty";
+    }
+
+    if (!isLikelyIban(trimmed)) {
+      return "account_number";
+    }
+
+    return isValidIbanChecksum(trimmed) ? "valid" : "invalid";
+  }, [bankAccountValue]);
+
+  const missingMandatoryRequirements = useMemo(
+    () =>
+      requirements.filter((requirement) => {
+        if (requirement.requirementLevel !== "mandatory") {
+          return false;
+        }
+
+        const files = filesByCode[requirement.code] ?? [];
+        return files.length === 0;
+      }),
+    [filesByCode, requirements]
+  );
+
+  function RequiredAsterisk() {
+    return (
+      <span aria-hidden="true" className="ml-0.5 text-rose-600">
+        *
+      </span>
+    );
+  }
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.5fr_1fr]">
+      <div className="xl:col-span-2 flex justify-end">
+        <div
+          data-testid="supplier-autosave-indicator"
+          aria-live="polite"
+          className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+            draftStatus === "saving"
+              ? "border-[var(--border-strong)] bg-[var(--primary-soft)] text-[var(--primary)]"
+              : draftStatus === "saved"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : draftStatus === "error"
+                  ? "border-rose-300 bg-rose-50 text-rose-700"
+                  : "border-slate-300 bg-slate-100 text-slate-600"
+          } transition-colors duration-200`}
+        >
+          {draftStatus === "saving" ? (
+            <LoaderCircle aria-hidden="true" className="h-3.5 w-3.5 animate-spin" strokeWidth={2} />
+          ) : draftStatus === "saved" ? (
+            <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2} />
+          ) : draftStatus === "error" ? (
+            <TriangleAlert aria-hidden="true" className="h-3.5 w-3.5" strokeWidth={2} />
+          ) : (
+            <Circle aria-hidden="true" className="h-3 w-3 fill-current" strokeWidth={2} />
+          )}
+          <span>{draftStatusText}</span>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-2 sm:col-span-2">
             <label htmlFor="street" className="text-sm font-semibold text-slate-700">
               {labels.street}
+              <RequiredAsterisk />
             </label>
             <input
               id="street"
@@ -209,6 +383,7 @@ export function SupplierOnboardingForm({
           <div className="grid gap-2">
             <label htmlFor="city" className="text-sm font-semibold text-slate-700">
               {labels.city}
+              <RequiredAsterisk />
             </label>
             <input
               id="city"
@@ -224,6 +399,7 @@ export function SupplierOnboardingForm({
           <div className="grid gap-2">
             <label htmlFor="postalCode" className="text-sm font-semibold text-slate-700">
               {labels.postalCode}
+              <RequiredAsterisk />
             </label>
             <input
               id="postalCode"
@@ -263,61 +439,40 @@ export function SupplierOnboardingForm({
               required
             />
             <div className="grid gap-2">
-              <label htmlFor="bankl" className="text-sm font-semibold text-slate-700">
-                {labels.bankl}
+              <label htmlFor="bankAccountValue" className="text-sm font-semibold text-slate-700">
+                {labels.ibanOrAccountNumber}
+                <RequiredAsterisk />
               </label>
               <input
-                id="bankl"
-                name="bankl"
-                maxLength={15}
-                required
-                value={bankl}
-                onChange={(event) => setBankl(event.target.value)}
-                className="oc-input"
-              />
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="iban" className="text-sm font-semibold text-slate-700">
-                {labels.iban}
-              </label>
-              <input
-                id="iban"
-                name="iban"
+                id="bankAccountValue"
                 maxLength={34}
-                value={iban}
-                onChange={(event) => setIban(event.target.value)}
+                required
+                value={bankAccountValue}
+                onChange={(event) => setBankAccountValue(event.target.value)}
                 className="oc-input"
               />
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="bankn" className="text-sm font-semibold text-slate-700">
-                {labels.bankn}
-              </label>
               <input
-                id="bankn"
+                type="hidden"
+                name="iban"
+                value={isLikelyIban(bankAccountValue) ? normalizeIbanInput(bankAccountValue) : ""}
+              />
+              <input
+                type="hidden"
                 name="bankn"
-                maxLength={18}
-                value={bankn}
-                onChange={(event) => setBankn(event.target.value)}
-                className="oc-input"
+                value={isLikelyIban(bankAccountValue) ? "" : bankAccountValue.trim()}
               />
-            </div>
-            <div className="grid gap-2">
-              <label htmlFor="bkont" className="text-sm font-semibold text-slate-700">
-                {labels.bkont}
-              </label>
-              <input
-                id="bkont"
-                name="bkont"
-                maxLength={2}
-                value={bkont}
-                onChange={(event) => setBkont(event.target.value)}
-                className="oc-input"
-              />
+              <input type="hidden" name="bankl" value="" />
+              <input type="hidden" name="bkont" value="" />
+              {ibanValidation === "invalid" ? (
+                <p className="text-xs text-rose-600">{labels.ibanInvalid}</p>
+              ) : ibanValidation === "valid" ? (
+                <p className="text-xs text-emerald-700">{labels.ibanValid}</p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <label htmlFor="accname" className="text-sm font-semibold text-slate-700">
                 {labels.accname}
+                <RequiredAsterisk />
               </label>
               <input
                 id="accname"
@@ -332,18 +487,6 @@ export function SupplierOnboardingForm({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              void handleSaveDraft();
-            }}
-            className="oc-btn oc-btn-secondary"
-          >
-            {labels.saveDraft}
-          </button>
-          {draftStatusText.length > 0 ? <p className="text-xs text-slate-600">{draftStatusText}</p> : null}
-        </div>
       </div>
 
       <aside className="space-y-3">
@@ -351,13 +494,32 @@ export function SupplierOnboardingForm({
           <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-600">{labels.requiredDocsTitle}</h3>
           <p className="mt-1 text-xs text-slate-500">{labels.requiredDocsSubtitle}</p>
         </div>
+        {missingMandatoryRequirements.length > 0 ? (
+          <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            <p className="font-semibold">{labels.missingMandatoryTitle}</p>
+            <p className="mt-1">{labels.missingMandatoryHint}</p>
+            <ul className="mt-1 list-disc pl-4">
+              {missingMandatoryRequirements.map((requirement) => (
+                <li key={requirement.code}>
+                  {requirement.code} - {requirement.label}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {requirements.map((requirement) => {
           const isOpen = activeRequirementCode === requirement.code;
           const uploadStatus = uploadStatusByCode[requirement.code] ?? "idle";
           const files = filesByCode[requirement.code] ?? [];
+          const missingMandatory = requirement.requirementLevel === "mandatory" && files.length === 0;
 
           return (
-            <section key={requirement.code} className="rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+            <section
+              key={requirement.code}
+              className={`rounded-lg border bg-[var(--surface)] ${
+                missingMandatory ? "border-rose-300 bg-rose-50/30" : "border-[var(--border)]"
+              }`}
+            >
               <button
                 type="button"
                 className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left"
@@ -382,6 +544,7 @@ export function SupplierOnboardingForm({
                 <div className="space-y-3 border-t border-[var(--border)] px-3 py-3">
                   {requirement.templateHref !== null ? (
                     <a href={requirement.templateHref} className="oc-btn oc-btn-secondary w-full justify-center">
+                      <Download aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
                       {labels.templateDownload}
                     </a>
                   ) : (

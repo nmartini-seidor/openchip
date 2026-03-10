@@ -17,6 +17,10 @@ const toastMessages: Record<string, { message: string; description?: string; var
     message: "Supplier information updated",
     description: "The case metadata now reflects the latest supplier details."
   },
+  document_expiry_updated: {
+    message: "Document expiry updated",
+    description: "Supplier document validity dates were saved."
+  },
   supplier_info_update_invalid: {
     message: "Could not update supplier information",
     description: "Please review the required fields.",

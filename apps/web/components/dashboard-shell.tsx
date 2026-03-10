@@ -6,6 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
+import { FilePlus2, LayoutDashboard, Settings, Users } from "lucide-react";
 import { InternalRole, SupportedLocale } from "@openchip/shared";
 
 interface ShellUser {
@@ -27,44 +28,6 @@ interface NavItem {
   label: string;
   isActive: (pathname: string) => boolean;
   icon: React.ReactNode;
-}
-
-function OverviewIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M3 10.2 10 4l7 6.2v6.3a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5z" />
-      <path d="M8 17v-4h4v4" />
-    </svg>
-  );
-}
-
-function CaseIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <rect x="3" y="3" width="14" height="14" rx="2" />
-      <path d="M6 7h8M6 10h8M6 13h5" />
-    </svg>
-  );
-}
-
-function UsersIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M6.5 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-      <path d="M13.5 9a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
-      <path d="M2.5 16a4.5 4.5 0 0 1 8 0" />
-      <path d="M10.5 16a3.7 3.7 0 0 1 6 0" />
-    </svg>
-  );
-}
-
-function SettingsIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6">
-      <path d="M10 3.2 11.2 5l2-.2.8 1.4-1.3 1.4.4 1.8 1.8.8v1.6l-1.8.8-.4 1.8 1.3 1.4-.8 1.4-2-.2L10 16.8l-1.2-1.8-2 .2-.8-1.4 1.3-1.4-.4-1.8-1.8-.8V9.2l1.8-.8.4-1.8L6 5.2l.8-1.4 2 .2z" />
-      <circle cx="10" cy="10" r="2.2" />
-    </svg>
-  );
 }
 
 function getInitials(user: ShellUser | null, guestInitials: string): string {
@@ -144,7 +107,7 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
       href: "/",
       label: t("nav.overview"),
       isActive: (value) => value === "/",
-      icon: <OverviewIcon />
+      icon: <LayoutDashboard aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
     }
   ];
 
@@ -153,7 +116,7 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
       href: "/cases/new",
       label: t("nav.newCase"),
       isActive: (value) => value === "/cases/new",
-      icon: <CaseIcon />
+      icon: <FilePlus2 aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
     });
   }
 
@@ -163,13 +126,13 @@ export function DashboardShell({ children, locale, sessionUser }: DashboardShell
         href: "/users",
         label: t("nav.users"),
         isActive: (value) => value === "/users",
-        icon: <UsersIcon />
+        icon: <Users aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
       },
       {
         href: "/portal-settings",
         label: t("nav.portalSettings"),
         isActive: (value) => value === "/portal-settings",
-        icon: <SettingsIcon />
+        icon: <Settings aria-hidden="true" className="h-4 w-4" strokeWidth={1.8} />
       }
     );
   }
