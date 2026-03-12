@@ -12,7 +12,8 @@
     "build": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "seed": "tsx src/seed.ts"
+    "seed": "tsx src/seed.ts",
+    "seed:mock": "tsx src/seed-mock-onboarding.ts"
   },
   "dependencies": {
     "@openchip/shared": "workspace:*",

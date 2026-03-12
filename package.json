@@ -11,7 +11,8 @@
     "test": "turbo test",
     "test:e2e": "pnpm --filter @openchip/web test:e2e",
     "test:e2e:demo": "pnpm --filter @openchip/web test:e2e:demo",
-    "db:seed": "pnpm --filter @openchip/db seed"
+    "db:seed": "pnpm --filter @openchip/db seed",
+    "db:seed:mock": "pnpm --filter @openchip/db seed:mock"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
