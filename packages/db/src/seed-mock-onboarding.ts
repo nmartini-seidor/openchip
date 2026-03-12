@@ -182,6 +182,44 @@ async function main(): Promise<void> {
   const actor = "mock.seed";
   const createdCases: string[] = [];
   let uploadedFilesCount = 0;
+  let uploadedTemplateFilesCount = 0;
+
+  const mandatoryDocumentCodes = new Set<string>();
+  const activeCategories = await repository.listSupplierCategories(false);
+  for (const category of activeCategories) {
+    const requirements = await repository.getRequirementPreview(category.code);
+    for (const requirement of requirements) {
+      if (requirement.requirementLevel === "mandatory") {
+        mandatoryDocumentCodes.add(requirement.code);
+      }
+    }
+  }
+
+  for (const code of [...mandatoryDocumentCodes].sort((left, right) => left.localeCompare(right))) {
+    const storagePath = `portal-templates/${code}/mock-template-${randomSuffix(10)}.pdf`;
+    const bytes = buildPdfBuffer([
+      "Openchip Supplier Document Template",
+      `Document Code: ${code}`,
+      "Purpose: Mock template for mandatory onboarding requirements",
+      `Generated: ${nowIso()}`,
+      `Template ID: ${randomSuffix(12)}`
+    ]);
+
+    await uploadPdf({
+      ...storage,
+      storagePath,
+      bytes
+    });
+
+    await repository.setDocumentTemplatePath(
+      {
+        code,
+        templateStoragePath: storagePath
+      },
+      actor
+    );
+    uploadedTemplateFilesCount += 1;
+  }
 
   for (const spec of mockCaseSpecs) {
     const suffix = randomSuffix();
@@ -292,6 +330,7 @@ async function main(): Promise<void> {
   }
 
   console.log(`Mock cases created: ${createdCases.length}`);
+  console.log(`Mandatory document templates uploaded: ${uploadedTemplateFilesCount}`);
   console.log(`Mandatory PDF documents uploaded: ${uploadedFilesCount}`);
   console.log(`Case IDs: ${createdCases.join(", ")}`);
 }
