@@ -176,6 +176,9 @@ test("supplier submit shows field-level guidance for invalid IBAN and marks mand
 
   await page.getByLabel(/IBAN|número de cuenta bancaria|bank account number/i).fill("ES00INVALIDIBAN");
   await page.getByLabel(/Bank account holder name|Titular de la cuenta bancaria/).fill("Proveedor Demo SL");
+  await page
+    .getByLabel(/I confirm this supplier information is correct|Confirmo que esta información del proveedor es correcta/i)
+    .check();
 
   const requirementSections = page.locator("aside section");
   const requirementCount = await requirementSections.count();

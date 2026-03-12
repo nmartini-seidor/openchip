@@ -401,7 +401,14 @@ export interface SupplierAddress {
   country: string;
 }
 
+export interface SupplierIdentity {
+  supplierName: string;
+  supplierVat: string;
+  supplierContactName: string;
+}
+
 export interface SupplierDraft {
+  supplierIdentity: Partial<SupplierIdentity>;
   address: Partial<SupplierAddress>;
   bankAccount: Partial<SupplierBankAccount>;
   uploadedDocuments: UploadedDocumentInput[];
@@ -572,6 +579,8 @@ export interface SapPurchaseRequestNewSupplierInput {
 
 export interface SupplierSubmissionInput {
   token: string;
+  supplierIdentity: SupplierIdentity;
+  identityConfirmed: boolean;
   address: SupplierAddress;
   bankAccount: SupplierBankAccount;
   uploadedDocuments: UploadedDocumentInput[];
@@ -579,6 +588,7 @@ export interface SupplierSubmissionInput {
 
 export interface SupplierDraftSaveInput {
   token: string;
+  supplierIdentity: Partial<SupplierIdentity>;
   address: Partial<SupplierAddress>;
   bankAccount: Partial<SupplierBankAccount>;
 }

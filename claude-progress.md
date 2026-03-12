@@ -1,12 +1,29 @@
 # Progress Log
 
 ## Current Objective
-Stabilize supplier portal UX around templates and autosave while keeping regression coverage green.
+Implement supplier identity validation in supplier portal (editable fields + mandatory confirmation) with draft autosave and canonical update on submit.
 
 ## Active Features
-- F-110 (completed in this session)
+- F-111 (completed in this session)
 
 ## Latest Completed Work
+- Added supplier identity review section to supplier portal form:
+  - preloaded and editable `Supplier name`, `Contact person`, and `Supplier VAT / Tax ID`.
+  - supplier email remains hidden in supplier portal.
+  - mandatory identity confirmation checkbox before submission.
+- Extended shared domain/schema contracts:
+  - `SupplierDraft` now includes `supplierIdentity`.
+  - `SupplierDraftSaveInput` accepts `supplierIdentity`.
+  - `SupplierSubmissionInput` requires `supplierIdentity` and `identityConfirmed`.
+  - `supplierSubmissionSchema` enforces identity confirmation.
+- Extended repository behavior:
+  - supplier identity edits persist in draft autosave.
+  - canonical case fields (`supplierName`, `supplierContactName`, `supplierVat`) update at submit time.
+  - identity updates are tracked in case action history and integration events.
+- Updated supplier submit validation field mapping and EN/ES localization for identity labels/confirmation message.
+- Added regression coverage:
+  - new Playwright spec `onboarding-supplier-identity-validation.spec.ts`.
+  - updated supplier e2e helpers/specs to satisfy confirmation requirement.
 - Added supplier portal UX hardening for this request:
   - renamed submit CTA to `Submit Response` and added icon.
   - wired EN/ES autosave labels and removed manual-save copy.
@@ -29,6 +46,11 @@ Stabilize supplier portal UX around templates and autosave while keeping regress
 - Updated localization keys (EN/ES) for new supplier/settings UX.
 
 ## Verification Executed
+- `pnpm --filter @openchip/shared typecheck` ✅
+- `pnpm --filter @openchip/db test` ✅
+- `pnpm --filter @openchip/web typecheck` ✅
+- `pnpm --filter @openchip/web test:e2e -- e2e/onboarding-supplier-identity-validation.spec.ts` ✅ (after locator strictness fix)
+- `pnpm --filter @openchip/web test:e2e -- e2e/onboarding-supplier-identity-validation.spec.ts e2e/onboarding-supplier-documents.spec.ts e2e/onboarding-validation.spec.ts` ✅ (7 passed)
 - `pnpm -r typecheck` ✅
 - `pnpm --filter @openchip/web test:e2e -- e2e/onboarding-supplier-template-autosave.spec.ts e2e/onboarding-supplier-documents.spec.ts` ✅ (3 passed)
 - `pnpm -r typecheck` ✅

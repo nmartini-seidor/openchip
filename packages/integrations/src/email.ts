@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 export interface SentEmailRecord {
   id: string;
@@ -8,7 +9,7 @@ export interface SentEmailRecord {
   text: string;
   html: string;
   createdAt: string;
-  channel: "smtp" | "in_memory";
+  channel: "smtp" | "in_memory" | "resend";
 }
 
 export interface InvitationEmailInput {
@@ -51,6 +52,9 @@ export interface EmailAdapterConfig {
   fromAddress: string;
   smtpHost?: string;
   smtpPort?: number;
+  resendApiKey?: string;
+  resendFrom?: string;
+  preferResend?: boolean;
   appBaseUrl?: string;
 }
 
@@ -303,8 +307,15 @@ function buildDocumentRejectedContent(
 export function createEmailAdapter(config: EmailAdapterConfig): EmailAdapter {
   const store = getEmailStore();
   const appBaseUrl = normalizeBaseUrl(config.appBaseUrl);
+  const preferResend = config.preferResend === true;
+  const resendApiKey = config.resendApiKey?.trim();
+  const resendFrom = config.resendFrom?.trim();
+  const resendEnabled = preferResend && resendApiKey !== undefined && resendApiKey.length > 0 && resendFrom !== undefined && resendFrom.length > 0;
 
   const smtpEnabled = config.smtpHost !== undefined && config.smtpPort !== undefined;
+  if (preferResend && !resendEnabled) {
+    console.warn("[email] Resend requested on Vercel but RESEND_API_KEY/RESEND_FROM are missing. Falling back.");
+  }
 
   const transporter = smtpEnabled
     ? nodemailer.createTransport({
@@ -314,33 +325,74 @@ export function createEmailAdapter(config: EmailAdapterConfig): EmailAdapter {
         tls: { rejectUnauthorized: false }
       })
     : null;
+  const resendClient = resendEnabled ? new Resend(resendApiKey) : null;
 
-  async function deliver(to: string, subject: string, text: string, html: string): Promise<SentEmailRecord> {
-    const channel: SentEmailRecord["channel"] = smtpEnabled ? "smtp" : "in_memory";
-
-    if (transporter !== null) {
-      await transporter.sendMail({
-        from: config.fromAddress,
-        to,
-        subject,
-        text,
-        html
-      });
-    }
-
+  function recordEmail(
+    to: string,
+    from: string,
+    subject: string,
+    text: string,
+    html: string,
+    channel: SentEmailRecord["channel"]
+  ): SentEmailRecord {
     const record: SentEmailRecord = {
       id: randomId(),
       to,
-      from: config.fromAddress,
+      from,
       subject,
       text,
       html,
       createdAt: nowIso(),
       channel
     };
-
     store.emails.unshift(record);
     return record;
+  }
+
+  function errorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return typeof error === "string" ? error : "Unknown error";
+  }
+
+  async function deliver(to: string, subject: string, text: string, html: string): Promise<SentEmailRecord> {
+    if (resendClient !== null && resendFrom !== undefined) {
+      try {
+        const response = await resendClient.emails.send({
+          from: resendFrom,
+          to: [to],
+          subject,
+          text,
+          html
+        });
+        if (response.error !== null) {
+          throw new Error(response.error.message);
+        }
+
+        return recordEmail(to, resendFrom, subject, text, html, "resend");
+      } catch (error) {
+        console.warn(`[email] Resend delivery failed: ${errorMessage(error)}. Falling back.`);
+      }
+    }
+
+    if (transporter !== null) {
+      try {
+        await transporter.sendMail({
+          from: config.fromAddress,
+          to,
+          subject,
+          text,
+          html
+        });
+
+        return recordEmail(to, config.fromAddress, subject, text, html, "smtp");
+      } catch (error) {
+        console.warn(`[email] SMTP delivery failed: ${errorMessage(error)}. Falling back to in-memory outbox.`);
+      }
+    }
+    return recordEmail(to, config.fromAddress, subject, text, html, "in_memory");
   }
 
   return {

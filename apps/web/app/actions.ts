@@ -33,6 +33,7 @@ import { evaluateCompliance } from "@openchip/workflow";
 import { actorFromSession, requireSessionRole, requireSessionUser } from "@/lib/auth";
 import { saveDocumentTemplate } from "@/lib/document-storage";
 import { getEmailAdapter } from "@/lib/email";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { sendSupplierInvitation } from "@/lib/invitation";
 import { onboardingRepository } from "@/lib/repository";
 import {
@@ -63,6 +64,11 @@ function readOptionalFormValue(formData: FormData, key: string): string | undefi
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function readCheckboxValue(formData: FormData, key: string): boolean {
+  const value = formData.get(key);
+  return value === "on" || value === "true" || value === "1";
 }
 
 function omitUndefined<T extends Record<string, string | undefined>>(value: T): { [K in keyof T]?: string } {
@@ -100,12 +106,16 @@ function buildSupplierSubmitErrorHref(
 }
 
 function getSupplierPortalLink(token: string): string {
-  const appBaseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+  const appBaseUrl = getAppBaseUrl();
   return new URL(`/supplier/${token}`, appBaseUrl).toString();
 }
 
 function collectSupplierValidationFields(paths: ReadonlyArray<readonly (string | number)[]>): string[] {
   const allowedFields = new Set([
+    "supplierName",
+    "supplierContactName",
+    "supplierVat",
+    "identityConfirmed",
     "street",
     "city",
     "postalCode",
@@ -125,6 +135,8 @@ function collectSupplierValidationFields(paths: ReadonlyArray<readonly (string |
     let candidate: string | null = null;
     if ((path[0] === "address" || path[0] === "bankAccount") && typeof path[1] === "string") {
       candidate = path[1];
+    } else if (path[0] === "supplierIdentity" && typeof path[1] === "string") {
+      candidate = path[1];
     } else if (typeof path[0] === "string") {
       candidate = path[0];
     }
@@ -134,7 +146,20 @@ function collectSupplierValidationFields(paths: ReadonlyArray<readonly (string |
     }
   }
 
-  const fieldOrder = ["street", "city", "postalCode", "country", "banks", "bankn", "accname", "iban"] as const;
+  const fieldOrder = [
+    "supplierName",
+    "supplierContactName",
+    "supplierVat",
+    "identityConfirmed",
+    "street",
+    "city",
+    "postalCode",
+    "country",
+    "banks",
+    "bankn",
+    "accname",
+    "iban"
+  ] as const;
   return fieldOrder.filter((field) => discoveredFields.has(field));
 }
 
@@ -230,6 +255,12 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
 
   const baseSubmission = supplierSubmissionSchema.safeParse({
     token,
+    supplierIdentity: {
+      supplierName: readFormValueOrEmpty(formData, "supplierName"),
+      supplierVat: readFormValueOrEmpty(formData, "supplierVat"),
+      supplierContactName: readFormValueOrEmpty(formData, "supplierContactName")
+    },
+    identityConfirmed: readCheckboxValue(formData, "identityConfirmed"),
     address: {
       street: readFormValueOrEmpty(formData, "street"),
       city: readFormValueOrEmpty(formData, "city"),
@@ -286,6 +317,8 @@ export async function supplierSubmitAction(formData: FormData): Promise<void> {
     const updatedCase = await onboardingRepository.submitSupplierResponse(
       {
         token,
+        supplierIdentity: baseSubmission.data.supplierIdentity,
+        identityConfirmed: baseSubmission.data.identityConfirmed,
         address: baseSubmission.data.address,
         bankAccount: baseSubmission.data.bankAccount,
         uploadedDocuments: []
@@ -388,6 +421,11 @@ export async function verifySupplierOtpAction(formData: FormData): Promise<void>
 export async function saveSupplierDraftAction(formData: FormData): Promise<void> {
   const parsed = supplierDraftSaveSchema.parse({
     token: readFormValue(formData, "token"),
+    supplierIdentity: {
+      supplierName: readOptionalFormValue(formData, "supplierName"),
+      supplierVat: readOptionalFormValue(formData, "supplierVat"),
+      supplierContactName: readOptionalFormValue(formData, "supplierContactName")
+    },
     address: {
       street: readOptionalFormValue(formData, "street"),
       city: readOptionalFormValue(formData, "city"),
@@ -406,6 +444,7 @@ export async function saveSupplierDraftAction(formData: FormData): Promise<void>
 
   const payload = {
     token: parsed.token,
+    supplierIdentity: omitUndefined(parsed.supplierIdentity),
     address: omitUndefined(parsed.address),
     bankAccount: omitUndefined(parsed.bankAccount)
   };

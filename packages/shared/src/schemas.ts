@@ -53,6 +53,12 @@ export const updateSupplierInfoInputSchema = createCaseInputSchema
 
 export const caseSourceChannelSchema = z.enum(caseSourceChannels);
 
+const supplierIdentitySchema = z.object({
+  supplierName: z.string().trim().min(2).max(120),
+  supplierVat: z.string().trim().min(3).max(64),
+  supplierContactName: z.string().trim().min(2).max(120)
+});
+
 function normalizeIban(value: string): string {
   return value.replace(/\s+/g, "").toUpperCase();
 }
@@ -179,6 +185,10 @@ export const uploadedDocumentInputSchema = z.object({
 
 export const supplierSubmissionSchema = z.object({
   token: z.string().trim().uuid(),
+  supplierIdentity: supplierIdentitySchema,
+  identityConfirmed: z.boolean().refine((value) => value, {
+    message: "Supplier identity must be confirmed."
+  }),
   address: z.object({
     street: z.string().trim().min(2).max(180),
     city: z.string().trim().min(2).max(120),
@@ -191,6 +201,13 @@ export const supplierSubmissionSchema = z.object({
 
 export const supplierDraftSaveSchema = z.object({
   token: z.string().trim().uuid(),
+  supplierIdentity: z
+    .object({
+      supplierName: z.string().trim().max(120).optional(),
+      supplierVat: z.string().trim().max(64).optional(),
+      supplierContactName: z.string().trim().max(120).optional()
+    })
+    .default({}),
   address: z
     .object({
       street: z.string().trim().max(180).optional(),

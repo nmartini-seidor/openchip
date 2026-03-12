@@ -150,6 +150,12 @@ describe("onboarding repository", () => {
     await repository.submitSupplierResponse(
       {
         token: invitationToken,
+        supplierIdentity: {
+          supplierName: created.supplierName,
+          supplierVat: created.supplierVat,
+          supplierContactName: created.supplierContactName
+        },
+        identityConfirmed: true,
         address: {
           street: "Street 1",
           city: "Barcelona",
@@ -214,6 +220,12 @@ describe("onboarding repository", () => {
     const resubmitted = await repository.submitSupplierResponse(
       {
         token: invitationToken,
+        supplierIdentity: {
+          supplierName: created.supplierName,
+          supplierVat: created.supplierVat,
+          supplierContactName: created.supplierContactName
+        },
+        identityConfirmed: true,
         address: {
           street: "Street 1",
           city: "Barcelona",

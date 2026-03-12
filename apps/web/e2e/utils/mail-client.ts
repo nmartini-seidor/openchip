@@ -8,7 +8,7 @@ interface OutboxEmail {
   text: string;
   html: string;
   createdAt: string;
-  channel: "smtp" | "in_memory";
+  channel: "smtp" | "in_memory" | "resend";
 }
 
 interface OutboxResponse {

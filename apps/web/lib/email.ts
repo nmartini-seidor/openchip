@@ -1,4 +1,5 @@
 import { createEmailAdapter, EmailAdapter } from "@openchip/integrations";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 
 declare global {
   var __openchipEmailAdapter: EmailAdapter | undefined;
@@ -21,10 +22,16 @@ export function getEmailAdapter(): EmailAdapter {
   if (globalThis.__openchipEmailAdapter === undefined) {
     const smtpHost = process.env.SMTP_HOST;
     const smtpPort = parsePort(process.env.SMTP_PORT);
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const resendFrom = process.env.RESEND_FROM;
+    const preferResend = process.env.VERCEL === "1" || process.env.VERCEL === "true";
 
     globalThis.__openchipEmailAdapter = createEmailAdapter({
-      fromAddress: process.env.SMTP_FROM ?? "onboarding@openchip.local",
-      appBaseUrl: process.env.APP_BASE_URL ?? "http://localhost:3000",
+      fromAddress: process.env.SMTP_FROM ?? process.env.RESEND_FROM ?? "onboarding@openchip.local",
+      appBaseUrl: getAppBaseUrl(),
+      preferResend,
+      ...(resendApiKey !== undefined ? { resendApiKey } : {}),
+      ...(resendFrom !== undefined ? { resendFrom } : {}),
       ...(smtpHost !== undefined ? { smtpHost } : {}),
       ...(smtpPort !== undefined ? { smtpPort } : {})
     });

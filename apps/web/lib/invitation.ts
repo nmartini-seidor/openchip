@@ -1,11 +1,8 @@
 import { OnboardingCase } from "@openchip/shared";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { getEmailAdapter } from "@/lib/email";
 import { onboardingRepository } from "@/lib/repository";
 import { triggerCaseWorkflows } from "@/lib/workflow-runner";
-
-function getAppBaseUrl(): string {
-  return process.env.APP_BASE_URL ?? "http://127.0.0.1:3005";
-}
 
 export async function sendSupplierInvitation(caseId: string, actor: string): Promise<OnboardingCase> {
   const onboardingCase = await onboardingRepository.sendInvitation(caseId, actor);

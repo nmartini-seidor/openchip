@@ -267,6 +267,10 @@ export default async function SupplierPortalPage({
   );
   const invalidFieldKeys = parseCsvQueryParam(query.fields);
   const invalidFieldLabelByKey: Record<string, string> = {
+    supplierName: tSupplier("supplierName"),
+    supplierContactName: tSupplier("supplierContactName"),
+    supplierVat: tSupplier("supplierVat"),
+    identityConfirmed: tSupplier("identityConfirmLabel"),
     street: tSupplier("street"),
     city: tSupplier("city"),
     postalCode: tSupplier("postalCode"),
@@ -296,6 +300,7 @@ export default async function SupplierPortalPage({
 
   const initialAddress = onboardingCase.supplierDraft?.address ?? onboardingCase.supplierAddress ?? {};
   const initialBankAccountSource = onboardingCase.supplierDraft?.bankAccount ?? onboardingCase.supplierBankAccount;
+  const initialSupplierIdentity = onboardingCase.supplierDraft?.supplierIdentity ?? {};
 
   return (
     <main id="main-content" className="w-full">
@@ -361,6 +366,12 @@ export default async function SupplierPortalPage({
               <SupplierOnboardingForm
                 token={parsedToken.data}
                 labels={{
+                  supplierIdentityTitle: tSupplier("supplierIdentityTitle"),
+                  supplierIdentitySubtitle: tSupplier("supplierIdentitySubtitle"),
+                  supplierName: tSupplier("supplierName"),
+                  supplierContactName: tSupplier("supplierContactName"),
+                  supplierVat: tSupplier("supplierVat"),
+                  identityConfirmLabel: tSupplier("identityConfirmLabel"),
                   street: tSupplier("street"),
                   city: tSupplier("city"),
                   postalCode: tSupplier("postalCode"),
@@ -404,6 +415,11 @@ export default async function SupplierPortalPage({
                     []
                 }))}
                 initialDraft={{
+                  supplierIdentity: {
+                    supplierName: initialSupplierIdentity.supplierName ?? onboardingCase.supplierName,
+                    supplierVat: initialSupplierIdentity.supplierVat ?? onboardingCase.supplierVat,
+                    supplierContactName: initialSupplierIdentity.supplierContactName ?? onboardingCase.supplierContactName
+                  },
                   address: initialAddress,
                   bankAccount: {
                     ...(initialBankAccountSource?.banks !== undefined ? { banks: initialBankAccountSource.banks } : {}),

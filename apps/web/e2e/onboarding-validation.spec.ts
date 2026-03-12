@@ -50,6 +50,9 @@ test("reject then resubmit document flow works", async ({ page, request }, testI
     }
   ]);
   await expect(rejectedRequirement.getByRole("link", { name: "fin-01-correction.pdf" })).toBeVisible();
+  await page
+    .getByLabel(/I confirm this supplier information is correct|Confirmo que esta información del proveedor es correcta/i)
+    .check();
   await page.getByRole("button", { name: /Submit Response|Enviar respuesta/i }).click();
   await expect(page.getByTestId("supplier-submitted-card")).toBeVisible();
 

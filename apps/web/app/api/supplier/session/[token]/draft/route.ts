@@ -63,6 +63,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     updatedCase = await onboardingRepository.saveSupplierDraft(
       {
         token: parsedInput.data.token,
+        supplierIdentity: omitUndefined(parsedInput.data.supplierIdentity),
         address: omitUndefined(parsedInput.data.address),
         bankAccount: omitUndefined(parsedInput.data.bankAccount)
       },

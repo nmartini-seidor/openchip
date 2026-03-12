@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { validateDocumentSchema } from "@openchip/shared";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { getEmailAdapter } from "@/lib/email";
 import { onboardingRepository } from "@/lib/repository";
 
@@ -18,7 +19,7 @@ export async function POST(request: Request, context: { params: Promise<{ caseId
     );
 
     if (onboardingCase.invitationToken !== null) {
-      const appBaseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
+      const appBaseUrl = getAppBaseUrl();
       try {
         const emailAdapter = getEmailAdapter();
         await emailAdapter.sendDocumentRejectedEmail({

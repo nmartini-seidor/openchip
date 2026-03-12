@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { identifierSchema } from "@openchip/shared";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { getEmailAdapter } from "@/lib/email";
 import { onboardingRepository } from "@/lib/repository";
 
@@ -11,7 +12,7 @@ export async function POST(_: Request, context: { params: Promise<{ caseId: stri
   if (onboardingCase.invitationToken !== null && onboardingCase.invitationExpiresAt !== null) {
     const invitationLink = new URL(
       `/supplier/${onboardingCase.invitationToken}`,
-      process.env.APP_BASE_URL ?? "http://127.0.0.1:3005"
+      getAppBaseUrl()
     ).toString();
 
     const emailAdapter = getEmailAdapter();

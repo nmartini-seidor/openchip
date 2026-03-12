@@ -91,6 +91,7 @@ function cloneCase(onboardingCase: OnboardingCase): OnboardingCase {
       onboardingCase.supplierDraft === null
         ? null
         : {
+            supplierIdentity: { ...onboardingCase.supplierDraft.supplierIdentity },
             address: { ...onboardingCase.supplierDraft.address },
             bankAccount: { ...onboardingCase.supplierDraft.bankAccount },
             uploadedDocuments: onboardingCase.supplierDraft.uploadedDocuments.map((item) => ({
@@ -701,6 +702,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     }
 
     const currentDraft = onboardingCase.supplierDraft ?? {
+      supplierIdentity: {},
       address: {},
       bankAccount: {},
       uploadedDocuments: [],
@@ -708,6 +710,10 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     };
 
     onboardingCase.supplierDraft = {
+      supplierIdentity: {
+        ...currentDraft.supplierIdentity,
+        ...input.supplierIdentity
+      },
       address: {
         ...currentDraft.address,
         ...input.address
@@ -741,6 +747,7 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     }
 
     const currentDraft = onboardingCase.supplierDraft ?? {
+      supplierIdentity: {},
       address: {},
       bankAccount: {},
       uploadedDocuments: [],
@@ -811,6 +818,40 @@ class InMemoryOnboardingRepository implements OnboardingRepository {
     onboardingCase.supplierAddress = { ...input.address };
     onboardingCase.supplierCountry = input.address.country;
     onboardingCase.supplierBankAccount = cloneBankAccount(input.bankAccount);
+    const changedIdentityFields: string[] = [];
+    if (onboardingCase.supplierName !== input.supplierIdentity.supplierName) {
+      onboardingCase.supplierName = input.supplierIdentity.supplierName;
+      changedIdentityFields.push("supplierName");
+    }
+    if (onboardingCase.supplierVat !== input.supplierIdentity.supplierVat) {
+      const duplicateCase = [...this.store.cases.values()].find(
+        (candidate) =>
+          candidate.id !== onboardingCase.id &&
+          candidate.status !== "cancelled" &&
+          candidate.supplierVat.toLowerCase() === input.supplierIdentity.supplierVat.toLowerCase()
+      );
+      if (duplicateCase !== undefined) {
+        throw new Error("A supplier with the same VAT already exists in onboarding.");
+      }
+      onboardingCase.supplierVat = input.supplierIdentity.supplierVat;
+      changedIdentityFields.push("supplierVat");
+    }
+    if (onboardingCase.supplierContactName !== input.supplierIdentity.supplierContactName) {
+      onboardingCase.supplierContactName = input.supplierIdentity.supplierContactName;
+      changedIdentityFields.push("supplierContactName");
+    }
+    if (changedIdentityFields.length > 0) {
+      const changedAt = nowIso();
+      onboardingCase.actionHistory.push({
+        actionType: "supplier_info_updated",
+        changedAt,
+        actor,
+        note: `Supplier confirmed identity and updated fields: ${changedIdentityFields.join(", ")}`
+      });
+      this.pushEvent(onboardingCase, "supplier_identity_confirmed", actor, {
+        changedFields: changedIdentityFields.join(",")
+      });
+    }
 
     const requirements = await this.supplierConfigStore.listRequirementPreviewRows(onboardingCase.categoryCode);
     const uploadedDocumentsByCode = new Map<DocumentCode, UploadedDocumentFile[]>();
@@ -1385,6 +1426,7 @@ function normalizePersistedCase(rawCase: OnboardingCase): OnboardingCase {
       rawCase.supplierDraft === undefined || rawCase.supplierDraft === null
         ? null
         : {
+            supplierIdentity: rawCase.supplierDraft.supplierIdentity ?? {},
             address: rawCase.supplierDraft.address ?? {},
             bankAccount: rawCase.supplierDraft.bankAccount ?? {},
             uploadedDocuments: (rawCase.supplierDraft.uploadedDocuments ?? []).map((entry) => ({

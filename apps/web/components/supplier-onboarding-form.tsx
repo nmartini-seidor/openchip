@@ -16,6 +16,12 @@ interface SupplierRequirementView {
 }
 
 interface SupplierOnboardingFormLabels {
+  supplierIdentityTitle: string;
+  supplierIdentitySubtitle: string;
+  supplierName: string;
+  supplierContactName: string;
+  supplierVat: string;
+  identityConfirmLabel: string;
   street: string;
   city: string;
   postalCode: string;
@@ -45,6 +51,11 @@ interface SupplierOnboardingFormLabels {
 }
 
 interface SupplierDraftInitialValue {
+  supplierIdentity: {
+    supplierName?: string;
+    supplierVat?: string;
+    supplierContactName?: string;
+  };
   address: {
     street?: string;
     city?: string;
@@ -111,6 +122,10 @@ export function SupplierOnboardingForm({
   initialDraft,
   initialMissingDocumentCodes = []
 }: SupplierOnboardingFormProps) {
+  const [supplierName, setSupplierName] = useState(initialDraft.supplierIdentity.supplierName ?? "");
+  const [supplierVat, setSupplierVat] = useState(initialDraft.supplierIdentity.supplierVat ?? "");
+  const [supplierContactName, setSupplierContactName] = useState(initialDraft.supplierIdentity.supplierContactName ?? "");
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
   const [street, setStreet] = useState(initialDraft.address.street ?? "");
   const [city, setCity] = useState(initialDraft.address.city ?? "");
   const [postalCode, setPostalCode] = useState(initialDraft.address.postalCode ?? "");
@@ -142,6 +157,11 @@ export function SupplierOnboardingForm({
 
   const draftPayload = useMemo(
     () => ({
+      supplierIdentity: {
+        supplierName,
+        supplierVat,
+        supplierContactName
+      },
       address: {
         street,
         city,
@@ -155,7 +175,7 @@ export function SupplierOnboardingForm({
         iban: isLikelyIban(bankAccountValue) ? normalizeIbanInput(bankAccountValue) : ""
       }
     }),
-    [accname, bankAccountValue, banks, city, country, postalCode, street]
+    [accname, bankAccountValue, banks, city, country, postalCode, street, supplierContactName, supplierName, supplierVat]
   );
 
   const initialSerializedPayloadRef = useRef(JSON.stringify(draftPayload));
@@ -363,6 +383,69 @@ export function SupplierOnboardingForm({
       </div>
 
       <div className="space-y-4">
+        <div className="rounded-lg border border-[var(--border)]/80 bg-[var(--surface-muted)] p-4">
+          <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-600">{labels.supplierIdentityTitle}</h3>
+          <p className="mt-1 text-xs text-slate-500">{labels.supplierIdentitySubtitle}</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:col-span-2">
+              <label htmlFor="supplierName" className="text-sm font-semibold text-slate-700">
+                {labels.supplierName}
+                <RequiredAsterisk />
+              </label>
+              <input
+                id="supplierName"
+                name="supplierName"
+                required
+                autoComplete="organization"
+                value={supplierName}
+                onChange={(event) => setSupplierName(event.target.value)}
+                className="oc-input"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="supplierContactName" className="text-sm font-semibold text-slate-700">
+                {labels.supplierContactName}
+                <RequiredAsterisk />
+              </label>
+              <input
+                id="supplierContactName"
+                name="supplierContactName"
+                required
+                autoComplete="name"
+                value={supplierContactName}
+                onChange={(event) => setSupplierContactName(event.target.value)}
+                className="oc-input"
+              />
+            </div>
+            <div className="grid gap-2">
+              <label htmlFor="supplierVat" className="text-sm font-semibold text-slate-700">
+                {labels.supplierVat}
+                <RequiredAsterisk />
+              </label>
+              <input
+                id="supplierVat"
+                name="supplierVat"
+                required
+                autoComplete="off"
+                value={supplierVat}
+                onChange={(event) => setSupplierVat(event.target.value)}
+                className="oc-input"
+              />
+            </div>
+          </div>
+          <label className="mt-3 inline-flex cursor-pointer items-start gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              id="identityConfirmed"
+              name="identityConfirmed"
+              checked={identityConfirmed}
+              onChange={(event) => setIdentityConfirmed(event.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[var(--primary)] focus:ring-[var(--primary)]"
+            />
+            <span>{labels.identityConfirmLabel}</span>
+          </label>
+        </div>
+
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="grid gap-2 sm:col-span-2">
             <label htmlFor="street" className="text-sm font-semibold text-slate-700">

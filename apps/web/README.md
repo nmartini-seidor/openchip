@@ -75,9 +75,20 @@ The app uses mock login by email (no password).
 - Service role key: from `docker-compose.yml` (`SUPABASE_STORAGE_SERVICE_KEY`)
 - Backing object storage: MinIO (`minio` / `minio123`)
 
-### Mail / SMTP
+### Mail Delivery
+
+- Local (Docker/dev): SMTP via Mailpit
+- Vercel deployments: Resend (if configured)
+
+#### Local SMTP / Mailpit
 
 - SMTP Host: `localhost`
 - SMTP Port: `1025`
 - From: `onboarding@openchip.local`
 - Mailpit API base: `http://localhost:8025`
+
+#### Resend (Vercel)
+
+- `RESEND_API_KEY=<your-resend-api-key>`
+- `RESEND_FROM=<verified-sender@your-domain>`
+- Optional SMTP fallback can remain configured; app will soft-fallback if Resend is unavailable.

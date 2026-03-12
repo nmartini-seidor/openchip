@@ -145,6 +145,9 @@ export async function submitSupplierResponse(
     throw new Error(`Supplier OTP verification failed for ${supplierUrl}. Current URL: ${page.url()}`);
   }
   await expect(page.getByLabel(/Street|Calle/)).toBeVisible();
+  await expect(page.getByLabel(/Supplier name|Nombre del proveedor/)).toBeVisible();
+  await expect(page.getByLabel(/Contact person|Persona de contacto/)).toBeVisible();
+  await expect(page.getByLabel(/Supplier VAT \/ Tax ID|NIF\/CIF \/ Tax ID del proveedor/)).toBeVisible();
 
   await page.getByLabel(/Street|Calle/).fill("Carrer de Mallorca 123");
   await page.getByLabel(/City|Ciudad/).fill("Barcelona");
@@ -159,6 +162,9 @@ export async function submitSupplierResponse(
 
   await page.getByLabel(/IBAN|número de cuenta bancaria|bank account number/i).fill("ES9121000418450200051332");
   await page.getByLabel(/Bank account holder name|Titular de la cuenta bancaria/).fill("Proveedor Demo SL");
+  await page
+    .getByLabel(/I confirm this supplier information is correct|Confirmo que esta información del proveedor es correcta/i)
+    .check();
 
   const requirementSections = page.locator("aside section");
   const requirementCount = await requirementSections.count();

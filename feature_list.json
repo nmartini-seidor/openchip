@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "last_updated": "2026-03-10T11:55:00Z",
+  "last_updated": "2026-03-10T14:05:00Z",
   "features": [
     {
       "id": "F-101",
@@ -193,6 +193,34 @@
         "curl -sf -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/login"
       ],
       "notes": "Supplier portal now exposes configured template downloads, keeps non-template requirements clearly labeled, and shows autosave status with translated EN/ES copy."
+    },
+    {
+      "id": "F-111",
+      "title": "Supplier identity validation in supplier portal (editable + confirm)",
+      "status": "completed",
+      "dependencies": [
+        "F-104",
+        "F-106",
+        "F-107",
+        "F-108"
+      ],
+      "acceptance_criteria": [
+        "Supplier portal shows preloaded supplier identity fields (name, contact person, VAT) and keeps supplier email hidden",
+        "Supplier can edit identity fields and must confirm identity correctness before submit",
+        "Identity fields autosave in supplier draft and are promoted to canonical case fields at submit",
+        "Identity change is auditable and reflected in internal case view after supplier submission"
+      ],
+      "verification_steps": [
+        "pnpm --filter @openchip/shared typecheck",
+        "pnpm --filter @openchip/db test",
+        "pnpm --filter @openchip/web typecheck",
+        "pnpm --filter @openchip/web test:e2e -- e2e/onboarding-supplier-identity-validation.spec.ts",
+        "pnpm --filter @openchip/web test:e2e -- e2e/onboarding-supplier-identity-validation.spec.ts e2e/onboarding-supplier-documents.spec.ts e2e/onboarding-validation.spec.ts",
+        "docker compose up -d --build --force-recreate",
+        "docker compose ps",
+        "curl -sf -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/login"
+      ],
+      "notes": "Implemented editable supplier identity review in supplier portal with mandatory confirmation checkbox, draft autosave persistence, canonical field update on submit, and audit event tracking."
     }
   ]
 }

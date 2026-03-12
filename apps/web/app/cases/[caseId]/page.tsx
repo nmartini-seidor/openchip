@@ -24,13 +24,10 @@ import { StatusTimeline } from "@/components/status-timeline";
 import { SubmitButton } from "@/components/submit-button";
 import { WorkflowSwimlane } from "@/components/workflow-swimlane";
 import { requireSessionUser } from "@/lib/auth";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 import { formatDateTime } from "@/lib/format";
 import { onboardingRepository } from "@/lib/repository";
 import { countdownBadgeClass, getCountdown } from "@/lib/sla";
-
-function getAppBaseUrl(): string {
-  return process.env.APP_BASE_URL ?? "http://127.0.0.1:3005";
-}
 
 function getSupplierInvalidSince(documents: { requirementLevel: string; validTo: string | null }[]): string | null {
   const now = Date.now();

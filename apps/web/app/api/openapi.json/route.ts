@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { getAppBaseUrl } from "@/lib/app-base-url";
 
 function appBaseUrl(): string {
-  return process.env.APP_BASE_URL ?? "http://localhost:3000";
+  return getAppBaseUrl();
 }
 
 const sapNewSupplierRequestSchema = {
